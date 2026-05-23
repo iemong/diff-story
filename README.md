@@ -30,6 +30,20 @@ bun install -g diff-story    # or run from a clone: bun run start < diff.patch
 
 Requires [Bun](https://bun.sh) — the executable runs under `bun` via its shebang.
 
+## Install the agent skill
+
+This repo ships an [Agent Skill](https://github.blog/changelog/2026-04-16-manage-agent-skills-with-github-cli/)
+at `.github/skills/diff-story/SKILL.md` that teaches your agent the protocol
+below. Install it with the GitHub CLI:
+
+```bash
+gh skill install iemong/diff-story
+```
+
+The skill is what makes an agent reach for `diff-story` when you ask it to
+summarize, group, or reorder a diff — the agent then decides the chapters and
+hands them back to the CLI for rendering.
+
 ## How it works (the agent protocol)
 
 ```bash
