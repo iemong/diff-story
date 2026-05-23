@@ -1,5 +1,7 @@
-import { parseArgs } from "node:util";
 import { Errors } from "../errors";
+import { parseArgs } from "node:util";
+
+const FIRST = 0;
 
 export interface CliFlags {
   help: boolean;
@@ -16,33 +18,45 @@ export interface ParsedCli {
 }
 
 const OPTIONS = {
-  help: { type: "boolean", short: "h" },
-  version: { type: "boolean", short: "v" },
-  json: { type: "boolean" },
-  "json-schema": { type: "boolean" },
   chapters: { type: "string" },
   "chapters-json": { type: "string" },
+  help: { short: "h", type: "boolean" },
+  json: { type: "boolean" },
+  "json-schema": { type: "boolean" },
+  version: { short: "v", type: "boolean" },
 } as const;
 
-/** Parse argv into a command + normalized flags, or throw a DiffStoryError. */
-export function parseCliArgs(argv: string[]): ParsedCli {
-  let parsed: ReturnType<typeof parseArgs<{ options: typeof OPTIONS; allowPositionals: true }>>;
-  try {
-    parsed = parseArgs({ args: argv, options: OPTIONS, allowPositionals: true, strict: true });
-  } catch (error) {
-    throw Errors.badArguments(error instanceof Error ? error.message : String(error));
-  }
+type ParsedArgs = ReturnType<typeof parseArgs<{ options: typeof OPTIONS; allowPositionals: true }>>;
 
-  const values = parsed.values;
+const runParseArgs = (argv: string[]): ParsedArgs => {
+  try {
+    return parseArgs({ allowPositionals: true, args: argv, options: OPTIONS, strict: true });
+  } catch (error) {
+    let detail = String(error);
+    if (error instanceof Error) {
+      detail = error.message;
+    }
+    throw Errors.badArguments(detail);
+  }
+};
+
+/** Parse argv into a command + normalized flags, or throw a DiffStoryError. */
+export const parseCliArgs = (argv: string[]): ParsedCli => {
+  const parsed = runParseArgs(argv);
+  const { values } = parsed;
+  let command = "default";
+  if (parsed.positionals.length > FIRST) {
+    command = parsed.positionals[FIRST];
+  }
   return {
-    command: parsed.positionals.length > 0 ? parsed.positionals[0] : "default",
+    command,
     flags: {
-      help: values.help === true,
-      version: values.version === true,
-      json: values.json === true,
-      jsonSchema: values["json-schema"] === true,
       chapters: values.chapters,
       chaptersJson: values["chapters-json"],
+      help: values.help === true,
+      json: values.json === true,
+      jsonSchema: values["json-schema"] === true,
+      version: values.version === true,
     },
   };
-}
+};

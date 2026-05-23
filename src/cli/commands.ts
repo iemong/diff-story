@@ -1,50 +1,58 @@
-import { parseChaptersJson, reconcileChapters } from "../chapters";
-import { Errors } from "../errors";
-import { formatFilesJson, formatJson, formatStory } from "../formatter";
-import { parseUnifiedDiff } from "../parser";
-import { buildPlan } from "../plan";
 import type { Chapter, DiffFile, Io } from "../types";
+import { formatFilesJson, formatJson, formatStory } from "../formatter";
+import { parseChaptersJson, reconcileChapters } from "../chapters";
 import type { CliFlags } from "./args";
+import { Errors } from "../errors";
+import { buildPlan } from "../plan";
+import { parseUnifiedDiff } from "../parser";
 
-async function readFiles(io: Io): Promise<DiffFile[]> {
-  return parseUnifiedDiff(await io.readStdin());
-}
+const OK = 0;
 
-async function resolveChapters(flags: CliFlags, io: Io, files: DiffFile[]): Promise<Chapter[]> {
-  let text: string;
+const readFiles = async (io: Io): Promise<DiffFile[]> => parseUnifiedDiff(await io.readStdin());
+
+const readChaptersText = async (flags: CliFlags, io: Io): Promise<string> => {
   if (flags.chapters !== undefined) {
-    text = flags.chapters;
-  } else if (flags.chaptersJson !== undefined) {
-    try {
-      text = await io.readFile(flags.chaptersJson);
-    } catch (error) {
-      throw Errors.chaptersFileUnreadable(
-        flags.chaptersJson,
-        error instanceof Error ? error.message : String(error),
-      );
-    }
-  } else {
+    return flags.chapters;
+  }
+  if (flags.chaptersJson === undefined) {
     throw Errors.missingChapters();
   }
+  try {
+    return await io.readFile(flags.chaptersJson);
+  } catch (error) {
+    let detail = String(error);
+    if (error instanceof Error) {
+      detail = error.message;
+    }
+    throw Errors.chaptersFileUnreadable(flags.chaptersJson, detail);
+  }
+};
+
+const resolveChapters = async (flags: CliFlags, io: Io, files: DiffFile[]): Promise<Chapter[]> => {
+  const text = await readChaptersText(flags, io);
   return reconcileChapters(parseChaptersJson(text), files);
-}
+};
 
 /** Default command: emit the request the agent fulfils (the file plan). */
-export async function runPlan(io: Io): Promise<number> {
+export const runPlan = async (io: Io): Promise<number> => {
   io.write(`${buildPlan(await readFiles(io))}\n`);
-  return 0;
-}
+  return OK;
+};
 
 /** Parse the diff into structured files as JSON. */
-export async function runParse(io: Io): Promise<number> {
+export const runParse = async (io: Io): Promise<number> => {
   io.write(formatFilesJson(await readFiles(io)));
-  return 0;
-}
+  return OK;
+};
 
 /** Re-emit the diff grouped under the chapters the agent supplies. */
-export async function runFormat(flags: CliFlags, io: Io): Promise<number> {
+export const runFormat = async (flags: CliFlags, io: Io): Promise<number> => {
   const files = await readFiles(io);
   const chapters = await resolveChapters(flags, io, files);
-  io.write(flags.json ? formatJson(chapters, files) : formatStory(files, chapters));
-  return 0;
-}
+  let output = formatStory(files, chapters);
+  if (flags.json) {
+    output = formatJson(chapters, files);
+  }
+  io.write(output);
+  return OK;
+};

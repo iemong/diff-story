@@ -1,10 +1,15 @@
 import type { Io } from "../src/types";
 
+export const EXIT_OK = 0;
+export const EXIT_FAIL = 1;
+export const FIRST = 0;
+export const SECOND = 1;
+
 export interface FakeIoOptions {
   stdin?: string | (() => Promise<string>);
   files?: Record<string, string>;
   bunVersion?: string;
-  which?: (command: string) => Promise<string | null>;
+  which?: (command: string) => Promise<string | undefined>;
 }
 
 export interface FakeIo extends Io {
@@ -12,12 +17,18 @@ export interface FakeIo extends Io {
   err: string;
 }
 
-export function makeIo(options: FakeIoOptions = {}): FakeIo {
-  const stdin = options.stdin ?? "";
+const toReadStdin = (stdin: string | (() => Promise<string>)): (() => Promise<string>) => {
+  if (typeof stdin === "function") {
+    return stdin;
+  }
+  return () => Promise.resolve(stdin);
+};
+
+export const makeIo = (options: FakeIoOptions = {}): FakeIo => {
   const io: FakeIo = {
-    out: "",
+    bunVersion: options.bunVersion ?? "1.0.0-test",
     err: "",
-    readStdin: typeof stdin === "function" ? stdin : () => Promise.resolve(stdin),
+    out: "",
     readFile: (path: string) => {
       const files = options.files ?? {};
       if (!(path in files)) {
@@ -25,17 +36,21 @@ export function makeIo(options: FakeIoOptions = {}): FakeIo {
       }
       return Promise.resolve(files[path]);
     },
+    readStdin: toReadStdin(options.stdin ?? ""),
+    which: options.which ?? ((): Promise<string | undefined> => Promise.resolve("/usr/bin/git")),
     write: (text: string) => {
       io.out += text;
     },
     writeError: (text: string) => {
       io.err += text;
     },
-    bunVersion: options.bunVersion ?? "1.0.0-test",
-    which: options.which ?? ((): Promise<string | null> => Promise.resolve("/usr/bin/git")),
   };
   return io;
-}
+};
+
+/** A `which` that reports the executable as absent. */
+// eslint-disable-next-line unicorn/no-useless-undefined -- model an absent executable
+export const whichMissing = (): Promise<string | undefined> => Promise.resolve(undefined);
 
 export const SIMPLE_DIFF = [
   "diff --git a/src/a.ts b/src/a.ts",

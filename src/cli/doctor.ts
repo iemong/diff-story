@@ -1,5 +1,9 @@
-import parseDiff from "parse-diff";
 import type { Io } from "../types";
+import parseDiff from "parse-diff";
+
+const EXPECTED_FILES = 1;
+const OK = 0;
+const FAIL = 1;
 
 export interface DoctorCheck {
   name: string;
@@ -18,30 +22,42 @@ const SAMPLE_DIFF = [
 ].join("\n");
 
 /** Run the environment checks and return them plus an exit code. */
-export async function runDoctorChecks(io: Io): Promise<{ checks: DoctorCheck[]; code: number }> {
-  const checks: DoctorCheck[] = [];
-
-  checks.push({ name: "Bun runtime", ok: true, detail: io.bunVersion });
-
+export const runDoctorChecks = async (io: Io): Promise<{ checks: DoctorCheck[]; code: number }> => {
   const parsedSample = parseDiff(SAMPLE_DIFF);
-  checks.push({
-    name: "parse-diff",
-    ok: parsedSample.length === 1,
-    detail: parsedSample.length === 1 ? "working" : "unexpected output",
-  });
+  const parseOk = parsedSample.length === EXPECTED_FILES;
+  let parseDetail = "unexpected output";
+  if (parseOk) {
+    parseDetail = "working";
+  }
 
   const gitPath = await io.which("git");
-  checks.push({
-    name: "git",
-    ok: gitPath !== null,
-    detail: gitPath !== null ? gitPath : "not found in PATH",
-  });
+  const gitFound = typeof gitPath === "string";
+  let gitDetail = "not found in PATH";
+  if (typeof gitPath === "string") {
+    gitDetail = gitPath;
+  }
 
-  const code = checks.every((check) => check.ok) ? 0 : 1;
+  const checks: DoctorCheck[] = [
+    { detail: io.bunVersion, name: "Bun runtime", ok: true },
+    { detail: parseDetail, name: "parse-diff", ok: parseOk },
+    { detail: gitDetail, name: "git", ok: gitFound },
+  ];
+
+  let code = OK;
+  if (!checks.every((check) => check.ok)) {
+    code = FAIL;
+  }
   return { checks, code };
-}
+};
 
 /** Render the doctor checks as human-readable lines. */
-export function renderDoctor(checks: DoctorCheck[]): string {
-  return `${checks.map((check) => `${check.ok ? "✓" : "✗"} ${check.name}: ${check.detail}`).join("\n")}\n`;
-}
+export const renderDoctor = (checks: DoctorCheck[]): string => {
+  const lines = checks.map((check) => {
+    let mark = "✗";
+    if (check.ok) {
+      mark = "✓";
+    }
+    return `${mark} ${check.name}: ${check.detail}`;
+  });
+  return `${lines.join("\n")}\n`;
+};

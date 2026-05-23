@@ -1,18 +1,18 @@
-import { describe, expect, test } from "bun:test";
 import {
-  buildManifest,
-  buildPlan,
   CHAPTERS_SCHEMA,
   DiffStoryError,
   Errors,
+  VERSION,
+  buildManifest,
+  buildPlan,
   formatFilesJson,
   formatJson,
   formatStory,
   parseChaptersJson,
   parseUnifiedDiff,
   reconcileChapters,
-  VERSION,
 } from "../src/mod";
+import { describe, expect, test } from "bun:test";
 
 describe("public API (src/mod.ts)", () => {
   test("re-exports the composable primitives as functions", () => {

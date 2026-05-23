@@ -1,35 +1,36 @@
-import { describe, expect, test } from "bun:test";
 import {
-  appendLeftovers,
   CHAPTERS_SCHEMA,
+  appendLeftovers,
   parseChaptersJson,
   pruneUnknownFiles,
   reconcileChapters,
   validateChapterArray,
 } from "../src/chapters";
-import { DiffStoryError } from "../src/errors";
+import { FIRST, SECOND } from "./helpers";
+import { describe, expect, test } from "bun:test";
 import type { DiffFile } from "../src/types";
+import type { DiffStoryError } from "../src/errors";
 
-function file(path: string): DiffFile {
-  return {
-    from: path,
-    to: path,
-    path,
-    additions: 1,
-    deletions: 0,
-    binary: false,
-    rawText: `diff --git a/${path} b/${path}\n+content`,
-  };
-}
+const TWO = 2;
 
-function whyOf(fn: () => unknown): string {
+const file = (path: string): DiffFile => ({
+  additions: 1,
+  binary: false,
+  deletions: 0,
+  from: path,
+  path,
+  rawText: `diff --git a/${path} b/${path}\n+content`,
+  to: path,
+});
+
+const whyOf = (fn: () => unknown): string => {
   try {
     fn();
   } catch (error) {
     return (error as DiffStoryError).why;
   }
   throw new Error("expected the call to throw");
-}
+};
 
 describe("CHAPTERS_SCHEMA", () => {
   test("describes the chapters object the agent must produce", () => {
@@ -44,8 +45,8 @@ describe("CHAPTERS_SCHEMA", () => {
 
 describe("validateChapterArray", () => {
   test("accepts a well-formed array", () => {
-    expect(validateChapterArray([{ title: "T", synopsis: "S", files: ["a"] }])).toEqual([
-      { title: "T", synopsis: "S", files: ["a"] },
+    expect(validateChapterArray([{ files: ["a"], synopsis: "S", title: "T" }])).toEqual([
+      { files: ["a"], synopsis: "S", title: "T" },
     ]);
   });
   test("rejects a non-array", () => {
@@ -55,24 +56,26 @@ describe("validateChapterArray", () => {
     expect(whyOf(() => validateChapterArray(["nope"]))).toContain("chapter 0 is not an object");
   });
   test("rejects a null entry", () => {
-    expect(whyOf(() => validateChapterArray([null]))).toContain("chapter 0 is not an object");
+    expect(whyOf(() => validateChapterArray(JSON.parse("[null]")))).toContain(
+      "chapter 0 is not an object",
+    );
   });
   test("rejects a non-string title", () => {
-    expect(whyOf(() => validateChapterArray([{ title: 1, synopsis: "s", files: [] }]))).toContain(
+    expect(whyOf(() => validateChapterArray([{ files: [], synopsis: "s", title: 1 }]))).toContain(
       '"title"',
     );
   });
   test("rejects a non-string synopsis", () => {
-    expect(whyOf(() => validateChapterArray([{ title: "t", synopsis: 1, files: [] }]))).toContain(
+    expect(whyOf(() => validateChapterArray([{ files: [], synopsis: 1, title: "t" }]))).toContain(
       '"synopsis"',
     );
   });
   test("rejects a files field that is not an array of strings", () => {
     expect(
-      whyOf(() => validateChapterArray([{ title: "t", synopsis: "s", files: ["ok", 1] }])),
+      whyOf(() => validateChapterArray([{ files: ["ok", true], synopsis: "s", title: "t" }])),
     ).toContain('"files"');
     expect(
-      whyOf(() => validateChapterArray([{ title: "t", synopsis: "s", files: "x" }])),
+      whyOf(() => validateChapterArray([{ files: "x", synopsis: "s", title: "t" }])),
     ).toContain('"files"');
   });
 });
@@ -80,12 +83,12 @@ describe("validateChapterArray", () => {
 describe("parseChaptersJson", () => {
   test("accepts a bare array", () => {
     expect(parseChaptersJson('[{"title":"T","synopsis":"S","files":["a"]}]')).toEqual([
-      { title: "T", synopsis: "S", files: ["a"] },
+      { files: ["a"], synopsis: "S", title: "T" },
     ]);
   });
   test("accepts a { chapters: [...] } object", () => {
     expect(parseChaptersJson('{"chapters":[{"title":"T","synopsis":"S","files":["a"]}]}')).toEqual([
-      { title: "T", synopsis: "S", files: ["a"] },
+      { files: ["a"], synopsis: "S", title: "T" },
     ]);
   });
   test("throws DS_E011 on malformed JSON", () => {
@@ -94,17 +97,20 @@ describe("parseChaptersJson", () => {
   test("throws DS_E011 when neither array nor chapters object", () => {
     expect(() => parseChaptersJson('{"nope":1}')).toThrow("DS_E011");
   });
+  test("throws DS_E011 for a non-array, non-object JSON value", () => {
+    expect(() => parseChaptersJson("42")).toThrow("DS_E011");
+  });
 });
 
 describe("pruneUnknownFiles", () => {
   test("drops unknown paths and empties", () => {
     const files = [file("a"), file("b")];
     const chapters = [
-      { title: "c1", synopsis: "s", files: ["a", "ghost"] },
-      { title: "c2", synopsis: "s", files: ["ghost"] },
+      { files: ["a", "ghost"], synopsis: "s", title: "c1" },
+      { files: ["ghost"], synopsis: "s", title: "c2" },
     ];
     expect(pruneUnknownFiles(chapters, files)).toEqual([
-      { title: "c1", synopsis: "s", files: ["a"] },
+      { files: ["a"], synopsis: "s", title: "c1" },
     ]);
   });
 });
@@ -112,14 +118,14 @@ describe("pruneUnknownFiles", () => {
 describe("appendLeftovers", () => {
   test("adds an appendix for unreferenced files", () => {
     const files = [file("a"), file("b")];
-    const result = appendLeftovers([{ title: "c1", synopsis: "s", files: ["a"] }], files);
-    expect(result).toHaveLength(2);
-    expect(result[1].title).toContain("Appendix");
-    expect(result[1].files).toEqual(["b"]);
+    const result = appendLeftovers([{ files: ["a"], synopsis: "s", title: "c1" }], files);
+    expect(result).toHaveLength(TWO);
+    expect(result[SECOND].title).toContain("Appendix");
+    expect(result[SECOND].files).toEqual(["b"]);
   });
   test("returns the chapters unchanged when nothing is left over", () => {
     const files = [file("a")];
-    const chapters = [{ title: "c1", synopsis: "s", files: ["a"] }];
+    const chapters = [{ files: ["a"], synopsis: "s", title: "c1" }];
     expect(appendLeftovers(chapters, files)).toBe(chapters);
   });
 });
@@ -128,10 +134,10 @@ describe("reconcileChapters", () => {
   test("prunes unknowns then appends leftovers", () => {
     const files = [file("a"), file("b")];
     const result = reconcileChapters(
-      [{ title: "c1", synopsis: "s", files: ["a", "ghost"] }],
+      [{ files: ["a", "ghost"], synopsis: "s", title: "c1" }],
       files,
     );
-    expect(result[0]).toEqual({ title: "c1", synopsis: "s", files: ["a"] });
-    expect(result[1].files).toEqual(["b"]);
+    expect(result[FIRST]).toEqual({ files: ["a"], synopsis: "s", title: "c1" });
+    expect(result[SECOND].files).toEqual(["b"]);
   });
 });

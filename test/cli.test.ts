@@ -1,19 +1,21 @@
+import { EXIT_FAIL, EXIT_OK, makeIo, whichMissing } from "./helpers";
 import { describe, expect, test } from "bun:test";
-import { parseCliArgs } from "../src/cli/args";
 import { renderDoctor, runDoctorChecks } from "../src/cli/doctor";
-import { makeIo } from "./helpers";
+import { parseCliArgs } from "../src/cli/args";
+
+const GIT_CHECK = 2;
 
 describe("parseCliArgs", () => {
   test("defaults to the 'default' command with all flags off", () => {
     const parsed = parseCliArgs([]);
     expect(parsed.command).toBe("default");
     expect(parsed.flags).toEqual({
-      help: false,
-      version: false,
-      json: false,
-      jsonSchema: false,
       chapters: undefined,
       chaptersJson: undefined,
+      help: false,
+      json: false,
+      jsonSchema: false,
+      version: false,
     });
   });
 
@@ -33,12 +35,12 @@ describe("parseCliArgs", () => {
     ]);
     expect(parsed.command).toBe("format");
     expect(parsed.flags).toEqual({
-      help: false,
-      version: false,
-      json: true,
-      jsonSchema: true,
       chapters: '{"chapters":[]}',
       chaptersJson: "ch.json",
+      help: false,
+      json: true,
+      jsonSchema: true,
+      version: false,
     });
   });
 
@@ -56,25 +58,25 @@ describe("doctor", () => {
   test("passes when parse-diff and git are healthy", async () => {
     const io = makeIo({ bunVersion: "1.2.3" });
     const { checks, code } = await runDoctorChecks(io);
-    expect(code).toBe(0);
+    expect(code).toBe(EXIT_OK);
     expect(checks).toEqual([
-      { name: "Bun runtime", ok: true, detail: "1.2.3" },
-      { name: "parse-diff", ok: true, detail: "working" },
-      { name: "git", ok: true, detail: "/usr/bin/git" },
+      { detail: "1.2.3", name: "Bun runtime", ok: true },
+      { detail: "working", name: "parse-diff", ok: true },
+      { detail: "/usr/bin/git", name: "git", ok: true },
     ]);
   });
 
   test("fails when git is absent", async () => {
-    const io = makeIo({ which: () => Promise.resolve(null) });
+    const io = makeIo({ which: whichMissing });
     const { checks, code } = await runDoctorChecks(io);
-    expect(code).toBe(1);
-    expect(checks[2]).toEqual({ name: "git", ok: false, detail: "not found in PATH" });
+    expect(code).toBe(EXIT_FAIL);
+    expect(checks[GIT_CHECK]).toEqual({ detail: "not found in PATH", name: "git", ok: false });
   });
 
   test("renderDoctor marks each check with ✓ or ✗", () => {
     const text = renderDoctor([
-      { name: "good", ok: true, detail: "fine" },
-      { name: "bad", ok: false, detail: "broken" },
+      { detail: "fine", name: "good", ok: true },
+      { detail: "broken", name: "bad", ok: false },
     ]);
     expect(text).toBe("✓ good: fine\n✗ bad: broken\n");
   });

@@ -1,13 +1,15 @@
-import { describe, expect, test } from "bun:test";
 import { DiffStoryError, Errors } from "../src/errors";
+import { describe, expect, test } from "bun:test";
+
+const EMPTY = 0;
 
 describe("DiffStoryError", () => {
   test("carries code/what/why/how and a descriptive message", () => {
     const error = new DiffStoryError({
       code: "DS_TEST",
+      how: "the fix",
       what: "what happened",
       why: "the reason",
-      how: "the fix",
     });
     expect(error).toBeInstanceOf(Error);
     expect(error.name).toBe("DiffStoryError");
@@ -30,7 +32,7 @@ describe("DiffStoryError", () => {
 });
 
 describe("Errors catalog", () => {
-  const cases: Array<[string, DiffStoryError]> = [
+  const cases: [string, DiffStoryError][] = [
     ["DS_E001", Errors.emptyInput()],
     ["DS_E002", Errors.noDiffFound()],
     ["DS_E007", Errors.badArguments("x")],
@@ -43,9 +45,9 @@ describe("Errors catalog", () => {
 
   test.each(cases)("%s has a unique code and full triple", (code, error) => {
     expect(error.code).toBe(code);
-    expect(error.what.length).toBeGreaterThan(0);
-    expect(error.why.length).toBeGreaterThan(0);
-    expect(error.how.length).toBeGreaterThan(0);
+    expect(error.what.length).toBeGreaterThan(EMPTY);
+    expect(error.why.length).toBeGreaterThan(EMPTY);
+    expect(error.how.length).toBeGreaterThan(EMPTY);
   });
 
   test("all codes are unique", () => {

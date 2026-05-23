@@ -1,5 +1,5 @@
 /**
- * diff-story — reorder a unified diff into a narrative of chapters.
+ * Diff-story — reorder a unified diff into a narrative of chapters.
  *
  * A deterministic, runtime-agnostic library (no Bun/Node/Deno globals, no model
  * client). diff-story does not call an LLM itself: the agent driving it supplies

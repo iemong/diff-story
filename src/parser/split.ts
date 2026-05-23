@@ -1,5 +1,11 @@
 /** Pure helpers that turn raw unified-diff text into per-file segments. */
 
+const NONE = 0;
+const ADJACENT = 1;
+const PREFIX_LENGTH = 2;
+const MARKER_LENGTH = 4;
+const NOT_FOUND = -1;
+
 /**
  * Split a unified diff into verbatim per-file segments.
  *
@@ -7,7 +13,7 @@
  * unified diffs we split on a `--- ` line immediately followed by a `+++ `
  * line, which avoids misfiring on deletion lines that merely start with `-`.
  */
-export function splitDiffIntoFiles(raw: string): string[] {
+export const splitDiffIntoFiles = (raw: string): string[] => {
   if (raw.trim() === "") {
     return [];
   }
@@ -16,62 +22,68 @@ export function splitDiffIntoFiles(raw: string): string[] {
   const isGit = lines.some((line) => line.startsWith("diff --git "));
   const boundaries: number[] = [];
 
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i];
+  for (let index = NONE; index < lines.length; index++) {
+    const line = lines[index];
     if (isGit) {
       if (line.startsWith("diff --git ")) {
-        boundaries.push(i);
+        boundaries.push(index);
       }
     } else if (
       line.startsWith("--- ") &&
-      lines[i + 1] !== undefined &&
-      lines[i + 1].startsWith("+++ ")
+      lines[index + ADJACENT] !== undefined &&
+      lines[index + ADJACENT].startsWith("+++ ")
     ) {
-      boundaries.push(i);
+      boundaries.push(index);
     }
   }
 
-  if (boundaries.length === 0) {
+  if (boundaries.length === NONE) {
     return [raw];
   }
 
   const segments: string[] = [];
-  for (let b = 0; b < boundaries.length; b++) {
-    const start = boundaries[b];
-    const end = b + 1 < boundaries.length ? boundaries[b + 1] : lines.length;
+  for (let boundaryIndex = NONE; boundaryIndex < boundaries.length; boundaryIndex++) {
+    const start = boundaries[boundaryIndex];
+    let end = lines.length;
+    if (boundaryIndex + ADJACENT < boundaries.length) {
+      end = boundaries[boundaryIndex + ADJACENT];
+    }
     segments.push(lines.slice(start, end).join("\n"));
   }
   return segments;
-}
+};
 
 /** Strip a leading `a/` or `b/` prefix and any trailing tab-delimited timestamp. */
-export function stripPathToken(token: string): string {
+export const stripPathToken = (token: string): string => {
   let value = token;
   const tab = value.indexOf("\t");
-  if (tab !== -1) {
-    value = value.slice(0, tab);
+  if (tab !== NOT_FOUND) {
+    value = value.slice(NONE, tab);
   }
   value = value.trim();
   if (value === "/dev/null") {
     return value;
   }
   if (value.startsWith("a/") || value.startsWith("b/")) {
-    return value.slice(2);
+    return value.slice(PREFIX_LENGTH);
   }
   return value;
-}
+};
 
 /** Parse the `diff --git a/x b/y` header line into its two paths. */
-export function parseGitHeader(line: string): { from: string; to: string } | null {
-  const match = line.match(/^diff --git a\/(.+) b\/(.+)$/);
-  if (match === null) {
-    return null;
+export const parseGitHeader = (line: string): { from: string; to: string } | undefined => {
+  const match = line.match(/^diff --git a\/(.+) b\/(.+)$/u);
+  if (!match) {
+    return undefined;
   }
-  return { from: match[1], to: match[2] };
-}
+  const [, from, to] = match;
+  return { from, to };
+};
 
 /** Extract the from/to paths and binary flag from a single file segment. */
-export function parseSegmentMeta(segment: string): { from: string; to: string; binary: boolean } {
+export const parseSegmentMeta = (
+  segment: string,
+): { from: string; to: string; binary: boolean } => {
   const lines = segment.split("\n");
   let from = "";
   let to = "";
@@ -81,10 +93,10 @@ export function parseSegmentMeta(segment: string): { from: string; to: string; b
 
   for (const line of lines) {
     if (line.startsWith("--- ")) {
-      from = stripPathToken(line.slice(4));
+      from = stripPathToken(line.slice(MARKER_LENGTH));
       sawMinus = true;
     } else if (line.startsWith("+++ ")) {
-      to = stripPathToken(line.slice(4));
+      to = stripPathToken(line.slice(MARKER_LENGTH));
       sawPlus = true;
     } else if (line.startsWith("Binary files ") || line === "GIT binary patch") {
       binary = true;
@@ -93,18 +105,19 @@ export function parseSegmentMeta(segment: string): { from: string; to: string; b
 
   if (!sawMinus || !sawPlus) {
     const gitLine = lines.find((line) => line.startsWith("diff --git "));
-    const parsed = gitLine === undefined ? null : parseGitHeader(gitLine);
-    if (parsed !== null) {
-      from = parsed.from;
-      to = parsed.to;
+    if (gitLine !== undefined) {
+      const parsed = parseGitHeader(gitLine);
+      if (parsed !== undefined) {
+        ({ from, to } = parsed);
+      }
     }
   }
 
-  return { from, to, binary };
-}
+  return { binary, from, to };
+};
 
 /** Count added/removed content lines in a file segment. */
-export function countChanges(segment: string): { additions: number; deletions: number } {
+export const countChanges = (segment: string): { additions: number; deletions: number } => {
   let additions = 0;
   let deletions = 0;
   for (const line of segment.split("\n")) {
@@ -115,4 +128,4 @@ export function countChanges(segment: string): { additions: number; deletions: n
     }
   }
   return { additions, deletions };
-}
+};

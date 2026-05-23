@@ -1,18 +1,22 @@
 import type { DiffFile } from "../types";
 
+const ONE_BASED = 1;
+
 /** The chapters JSON shape the agent must produce, shown inline in the plan. */
 export const CHAPTERS_SHAPE =
   '{"chapters":[{"title":"...","synopsis":"...","files":["path", ...]}]}';
 
 /** Render the changed files as a numbered manifest with their +/- counts. */
-export function buildManifest(files: DiffFile[]): string {
-  return files
+export const buildManifest = (files: DiffFile[]): string =>
+  files
     .map((file, index) => {
-      const meta = `+${file.additions} -${file.deletions}${file.binary ? ", binary" : ""}`;
-      return `${index + 1}. ${file.path} (${meta})`;
+      let meta = `+${file.additions} -${file.deletions}`;
+      if (file.binary) {
+        meta += ", binary";
+      }
+      return `${index + ONE_BASED}. ${file.path} (${meta})`;
     })
     .join("\n");
-}
 
 /**
  * Build the request the calling agent fulfils: group the files into an ordered
@@ -21,8 +25,8 @@ export function buildManifest(files: DiffFile[]): string {
  * diff-story does not call a model itself — the agent driving it is the
  * intelligence. This keeps the tool a deterministic, dependency-light filter.
  */
-export function buildPlan(files: DiffFile[]): string {
-  return [
+export const buildPlan = (files: DiffFile[]): string =>
+  [
     `Group the ${files.length} changed files below into an ordered sequence of chapters`,
     "that reads as a narrative: earlier chapters set up the context later ones build on.",
     "Then render the story by piping the same diff to:",
@@ -39,4 +43,3 @@ export function buildPlan(files: DiffFile[]): string {
     `Files (${files.length}):`,
     buildManifest(files),
   ].join("\n");
-}

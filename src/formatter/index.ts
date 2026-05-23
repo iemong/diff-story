@@ -1,12 +1,17 @@
 import type { Chapter, DiffFile } from "../types";
 
-const BAR = "═".repeat(60);
+const BAR_WIDTH = 60;
 const SYNOPSIS_WIDTH = 72;
+const JSON_INDENT = 2;
+const ZERO = 0;
+const ONE = 1;
+
+const BAR = "═".repeat(BAR_WIDTH);
 
 /** Greedy word-wrap. CJK text without spaces stays on one line. */
-export function wordWrap(text: string, width: number): string[] {
-  const words = text.split(/\s+/).filter((word) => word.length > 0);
-  if (words.length === 0) {
+export const wordWrap = (text: string, width: number): string[] => {
+  const words = text.split(/\s+/u).filter((word) => word.length > ZERO);
+  if (words.length === ZERO) {
     return [""];
   }
 
@@ -15,7 +20,7 @@ export function wordWrap(text: string, width: number): string[] {
   for (const word of words) {
     if (current === "") {
       current = word;
-    } else if (current.length + 1 + word.length <= width) {
+    } else if (current.length + ONE + word.length <= width) {
       current = `${current} ${word}`;
     } else {
       lines.push(current);
@@ -24,13 +29,16 @@ export function wordWrap(text: string, width: number): string[] {
   }
   lines.push(current);
   return lines;
-}
+};
 
 /** Render a single chapter banner as a block of `#`-prefixed comment lines. */
-export function renderBanner(index: number, total: number, chapter: Chapter): string {
-  const synopsisLines = wordWrap(chapter.synopsis, SYNOPSIS_WIDTH).map((line, lineIndex) =>
-    lineIndex === 0 ? `# Synopsis: ${line}` : `#           ${line}`,
-  );
+export const renderBanner = (index: number, total: number, chapter: Chapter): string => {
+  const synopsisLines = wordWrap(chapter.synopsis, SYNOPSIS_WIDTH).map((line, lineIndex) => {
+    if (lineIndex === ZERO) {
+      return `# Synopsis: ${line}`;
+    }
+    return `#           ${line}`;
+  });
   return [
     `# ${BAR}`,
     `# 📖 Chapter ${index}/${total} — ${chapter.title}`,
@@ -38,46 +46,45 @@ export function renderBanner(index: number, total: number, chapter: Chapter): st
     ...synopsisLines,
     `# ${BAR}`,
   ].join("\n");
-}
+};
 
 /** Re-emit the diff grouped into chapters, each preceded by a banner. */
-export function formatStory(files: DiffFile[], chapters: Chapter[]): string {
+export const formatStory = (files: DiffFile[], chapters: Chapter[]): string => {
   const byPath = new Map(files.map((file) => [file.path, file]));
   const blocks: string[] = [];
 
   chapters.forEach((chapter, index) => {
-    blocks.push(renderBanner(index + 1, chapters.length, chapter));
+    blocks.push(renderBanner(index + ONE, chapters.length, chapter));
     for (const path of chapter.files) {
       const file = byPath.get(path);
       if (file !== undefined) {
-        blocks.push(file.rawText.replace(/\s+$/, ""));
+        blocks.push(file.rawText.replace(/\s+$/u, ""));
       }
     }
   });
 
   return `${blocks.join("\n\n")}\n`;
-}
+};
 
 /** Serialize parsed files as JSON (the `parse` command output). */
-export function formatFilesJson(files: DiffFile[]): string {
-  return `${JSON.stringify({ files }, null, 2)}\n`;
-}
+export const formatFilesJson = (files: DiffFile[]): string =>
+  `${JSON.stringify({ files }, undefined, JSON_INDENT)}\n`;
 
 /** Serialize the resolved story as JSON (the `format --json` output). */
-export function formatJson(chapters: Chapter[], files: DiffFile[]): string {
+export const formatJson = (chapters: Chapter[], files: DiffFile[]): string => {
   const byPath = new Map(files.map((file) => [file.path, file]));
   const enriched = chapters.map((chapter) => ({
-    title: chapter.title,
-    synopsis: chapter.synopsis,
     files: chapter.files.map((path) => {
       const file = byPath.get(path);
       return {
-        path,
-        additions: file?.additions ?? 0,
-        deletions: file?.deletions ?? 0,
+        additions: file?.additions ?? ZERO,
         binary: file?.binary ?? false,
+        deletions: file?.deletions ?? ZERO,
+        path,
       };
     }),
+    synopsis: chapter.synopsis,
+    title: chapter.title,
   }));
-  return `${JSON.stringify({ chapters: enriched }, null, 2)}\n`;
-}
+  return `${JSON.stringify({ chapters: enriched }, undefined, JSON_INDENT)}\n`;
+};

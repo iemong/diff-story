@@ -1,7 +1,9 @@
-import parseDiff from "parse-diff";
-import { Errors } from "../errors";
-import type { DiffFile } from "../types";
 import { countChanges, parseSegmentMeta, splitDiffIntoFiles } from "./split";
+import type { DiffFile } from "../types";
+import { Errors } from "../errors";
+import parseDiff from "parse-diff";
+
+const NO_FILES = 0;
 
 /**
  * Parse a unified diff into structured files.
@@ -10,19 +12,22 @@ import { countChanges, parseSegmentMeta, splitDiffIntoFiles } from "./split";
  * our own splitter preserves each file's verbatim text so the diff can be
  * re-emitted faithfully after reordering.
  */
-export function parseUnifiedDiff(raw: string): DiffFile[] {
+export const parseUnifiedDiff = (raw: string): DiffFile[] => {
   if (raw.trim() === "") {
     throw Errors.emptyInput();
   }
 
-  if (parseDiff(raw).length === 0) {
+  if (parseDiff(raw).length === NO_FILES) {
     throw Errors.noDiffFound();
   }
 
   return splitDiffIntoFiles(raw).map((rawText) => {
     const { from, to, binary } = parseSegmentMeta(rawText);
     const { additions, deletions } = countChanges(rawText);
-    const path = to !== "" && to !== "/dev/null" ? to : from;
-    return { from, to, path, additions, deletions, binary, rawText };
+    let path = from;
+    if (to !== "" && to !== "/dev/null") {
+      path = to;
+    }
+    return { additions, binary, deletions, from, path, rawText, to };
   });
-}
+};

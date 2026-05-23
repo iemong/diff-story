@@ -38,5 +38,5 @@ export interface Io {
   write(text: string): void;
   writeError(text: string): void;
   bunVersion: string;
-  which(command: string): Promise<string | null>;
+  which(command: string): Promise<string | undefined>;
 }

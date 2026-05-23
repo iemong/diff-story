@@ -1,5 +1,4 @@
-import { describe, expect, test } from "bun:test";
-import { parseUnifiedDiff } from "../src/parser";
+import { FIRST, SECOND, SIMPLE_DIFF, TWO_FILE_DIFF } from "./helpers";
 import {
   countChanges,
   parseGitHeader,
@@ -7,7 +6,11 @@ import {
   splitDiffIntoFiles,
   stripPathToken,
 } from "../src/parser/split";
-import { SIMPLE_DIFF, TWO_FILE_DIFF } from "./helpers";
+import { describe, expect, test } from "bun:test";
+import { parseUnifiedDiff } from "../src/parser";
+
+const ONE_FILE = 1;
+const TWO_FILES = 2;
 
 describe("splitDiffIntoFiles", () => {
   test("returns [] for blank input", () => {
@@ -17,10 +20,10 @@ describe("splitDiffIntoFiles", () => {
 
   test("splits a git diff on diff --git boundaries", () => {
     const segments = splitDiffIntoFiles(TWO_FILE_DIFF);
-    expect(segments).toHaveLength(2);
-    expect(segments[0].startsWith("diff --git a/src/a.ts")).toBe(true);
-    expect(segments[1].startsWith("diff --git a/src/b.ts")).toBe(true);
-    expect(segments[1]).toContain("const b = 2;");
+    expect(segments).toHaveLength(TWO_FILES);
+    expect(segments[FIRST].startsWith("diff --git a/src/a.ts")).toBe(true);
+    expect(segments[SECOND].startsWith("diff --git a/src/b.ts")).toBe(true);
+    expect(segments[SECOND]).toContain("const b = 2;");
   });
 
   test("splits a non-git unified diff on --- / +++ pairs", () => {
@@ -37,16 +40,16 @@ describe("splitDiffIntoFiles", () => {
       "+q",
     ].join("\n");
     const segments = splitDiffIntoFiles(raw);
-    expect(segments).toHaveLength(2);
-    expect(segments[0].startsWith("--- a.txt")).toBe(true);
-    expect(segments[1].startsWith("--- b.txt")).toBe(true);
+    expect(segments).toHaveLength(TWO_FILES);
+    expect(segments[FIRST].startsWith("--- a.txt")).toBe(true);
+    expect(segments[SECOND].startsWith("--- b.txt")).toBe(true);
   });
 
   test("does not treat a deletion line as a boundary", () => {
     const raw = ["--- a.txt", "+++ a.txt", "@@ -1,2 +1,1 @@", "--- not a header", " keep"].join(
       "\n",
     );
-    expect(splitDiffIntoFiles(raw)).toHaveLength(1);
+    expect(splitDiffIntoFiles(raw)).toHaveLength(ONE_FILE);
   });
 
   test("returns the whole input when no boundary is found", () => {
@@ -58,8 +61,8 @@ describe("splitDiffIntoFiles", () => {
   test("does not crash when a trailing '--- ' line has no following line", () => {
     const raw = ["--- a.txt", "+++ b.txt", "@@ -1 +1 @@", "-x", "+y", "--- dangling"].join("\n");
     const segments = splitDiffIntoFiles(raw);
-    expect(segments).toHaveLength(1);
-    expect(segments[0]).toContain("--- dangling");
+    expect(segments).toHaveLength(ONE_FILE);
+    expect(segments[FIRST]).toContain("--- dangling");
   });
 });
 
@@ -90,27 +93,27 @@ describe("parseGitHeader", () => {
       to: "foo.ts",
     });
   });
-  test("returns null for a non-matching line", () => {
-    expect(parseGitHeader("index 111..222")).toBeNull();
+  test("returns undefined for a non-matching line", () => {
+    expect(parseGitHeader("index 111..222")).toBeUndefined();
   });
 });
 
 describe("parseSegmentMeta", () => {
   test("reads from/to from --- and +++ lines", () => {
     const meta = parseSegmentMeta(SIMPLE_DIFF);
-    expect(meta).toEqual({ from: "src/a.ts", to: "src/a.ts", binary: false });
+    expect(meta).toEqual({ binary: false, from: "src/a.ts", to: "src/a.ts" });
   });
 
   test("reads distinct from/to from a non-git segment (no diff --git fallback)", () => {
     const seg = ["--- a/old.ts", "+++ b/new.ts", "@@ -1 +1 @@", "-x", "+y"].join("\n");
-    expect(parseSegmentMeta(seg)).toEqual({ from: "old.ts", to: "new.ts", binary: false });
+    expect(parseSegmentMeta(seg)).toEqual({ binary: false, from: "old.ts", to: "new.ts" });
   });
 
   test("returns empty paths when there are no headers and no git line at all", () => {
     expect(parseSegmentMeta("just some text\nwithout any headers")).toEqual({
+      binary: false,
       from: "",
       to: "",
-      binary: false,
     });
   });
 
@@ -130,7 +133,7 @@ describe("parseSegmentMeta", () => {
   });
 
   test("leaves paths empty when neither headers nor a git line are parseable", () => {
-    expect(parseSegmentMeta("diff --git nonsense")).toEqual({ from: "", to: "", binary: false });
+    expect(parseSegmentMeta("diff --git nonsense")).toEqual({ binary: false, from: "", to: "" });
   });
 });
 
@@ -163,16 +166,16 @@ describe("parseUnifiedDiff", () => {
 
   test("parses a single-file diff into structured metadata", () => {
     const files = parseUnifiedDiff(SIMPLE_DIFF);
-    expect(files).toHaveLength(1);
-    expect(files[0]).toMatchObject({
-      from: "src/a.ts",
-      to: "src/a.ts",
-      path: "src/a.ts",
+    expect(files).toHaveLength(ONE_FILE);
+    expect(files[FIRST]).toMatchObject({
       additions: 1,
-      deletions: 1,
       binary: false,
+      deletions: 1,
+      from: "src/a.ts",
+      path: "src/a.ts",
+      to: "src/a.ts",
     });
-    expect(files[0].rawText).toBe(SIMPLE_DIFF);
+    expect(files[FIRST].rawText).toBe(SIMPLE_DIFF);
   });
 
   test("uses the from path for a deleted file", () => {
@@ -184,7 +187,7 @@ describe("parseUnifiedDiff", () => {
       "-bye",
     ].join("\n");
     const files = parseUnifiedDiff(raw);
-    expect(files[0].path).toBe("gone.ts");
+    expect(files[FIRST].path).toBe("gone.ts");
   });
 
   test("uses the to path for an added file", () => {
@@ -196,7 +199,7 @@ describe("parseUnifiedDiff", () => {
       "+hi",
     ].join("\n");
     const files = parseUnifiedDiff(raw);
-    expect(files[0].path).toBe("new.ts");
+    expect(files[FIRST].path).toBe("new.ts");
   });
 
   test("parses a two-file diff", () => {

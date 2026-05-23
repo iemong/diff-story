@@ -3,8 +3,14 @@
   "plugins": ["typescript", "unicorn", "oxc"],
   "categories": {
     "correctness": "error",
-    "suspicious": "warn",
-    "perf": "warn"
+    "suspicious": "error",
+    "perf": "error",
+    "style": "error",
+    "pedantic": "error"
+  },
+  "rules": {
+    "max-statements": "off",
+    "max-lines-per-function": "off"
   },
   "ignorePatterns": ["node_modules", ".stryker-tmp", "coverage", "reports", "dist"]
 }
