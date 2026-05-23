@@ -1,0 +1,12 @@
+{
+  "$schema": "https://jsr.io/schema/config-file.v1.json",
+  "name": "@iemong/diff-story",
+  "version": "0.1.0",
+  "exports": {
+    ".": "./src/mod.ts"
+  },
+  "publish": {
+    "include": ["src", "README.md", "SKILL.md", "LICENSE"],
+    "exclude": ["src/io.ts", "src/**/*.test.ts", "test"]
+  }
+}
