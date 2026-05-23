@@ -21,14 +21,6 @@ const SAMPLE_DIFF = [
 export async function runDoctorChecks(io: Io): Promise<{ checks: DoctorCheck[]; code: number }> {
   const checks: DoctorCheck[] = [];
 
-  const apiKey = io.env.ANTHROPIC_API_KEY;
-  const hasApiKey = apiKey !== undefined && apiKey !== "";
-  checks.push({
-    name: "ANTHROPIC_API_KEY",
-    ok: hasApiKey,
-    detail: hasApiKey ? "set" : "not set",
-  });
-
   checks.push({ name: "Bun runtime", ok: true, detail: io.bunVersion });
 
   const parsedSample = parseDiff(SAMPLE_DIFF);

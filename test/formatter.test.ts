@@ -1,14 +1,6 @@
 import { describe, expect, test } from "bun:test";
-import {
-  formatFilesJson,
-  formatJson,
-  formatSchema,
-  formatStory,
-  OUTPUT_JSON_SCHEMA,
-  renderBanner,
-  wordWrap,
-} from "../src/formatter";
-import type { AnalysisResult, Chapter, DiffFile } from "../src/types";
+import { formatFilesJson, formatJson, formatStory, renderBanner, wordWrap } from "../src/formatter";
+import type { Chapter, DiffFile } from "../src/types";
 
 function file(path: string, extra: Partial<DiffFile> = {}): DiffFile {
   return {
@@ -98,37 +90,27 @@ describe("formatFilesJson", () => {
 });
 
 describe("formatJson", () => {
-  const result: AnalysisResult = {
-    chapters: [{ title: "T", synopsis: "S", files: ["a.ts"] }],
-    stats: { inputTokens: 1, outputTokens: 2, durationMs: 3, model: "m" },
-  };
+  const chapters: Chapter[] = [{ title: "T", synopsis: "S", files: ["a.ts"] }];
 
-  test("renders chapters with per-file stats and the run stats", () => {
-    const json = JSON.parse(formatJson(result, [file("a.ts")]));
+  test("renders chapters with per-file stats and no run stats", () => {
+    const json = JSON.parse(formatJson(chapters, [file("a.ts")]));
+    expect(json.chapters[0]).toMatchObject({ title: "T", synopsis: "S" });
     expect(json.chapters[0].files[0]).toEqual({
       path: "a.ts",
       additions: 2,
       deletions: 1,
       binary: false,
     });
-    expect(json.stats).toEqual({ inputTokens: 1, outputTokens: 2, durationMs: 3, model: "m" });
+    expect(json.stats).toBeUndefined();
   });
 
   test("defaults stats to zero for files missing from the diff", () => {
-    const json = JSON.parse(formatJson(result, []));
+    const json = JSON.parse(formatJson(chapters, []));
     expect(json.chapters[0].files[0]).toEqual({
       path: "a.ts",
       additions: 0,
       deletions: 0,
       binary: false,
     });
-  });
-});
-
-describe("formatSchema", () => {
-  test("emits the output JSON schema", () => {
-    const schema = JSON.parse(formatSchema());
-    expect(schema).toEqual(OUTPUT_JSON_SCHEMA);
-    expect(schema.required).toEqual(["chapters", "stats"]);
   });
 });

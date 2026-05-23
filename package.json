@@ -44,7 +44,6 @@
     "prepare": "lefthook install"
   },
   "dependencies": {
-    "@anthropic-ai/sdk": "0.98.0",
     "parse-diff": "0.12.0"
   },
   "devDependencies": {

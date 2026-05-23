@@ -1,37 +1,10 @@
-import type { Io, LlmClient, LlmRequest } from "../src/types";
-
-export interface FakeLlmOptions {
-  text?: string;
-  error?: Error;
-  inputTokens?: number;
-  outputTokens?: number;
-  capture?: (request: LlmRequest) => void;
-}
-
-export function fakeLlm(options: FakeLlmOptions = {}): LlmClient {
-  return {
-    complete: (request: LlmRequest) => {
-      options.capture?.(request);
-      if (options.error !== undefined) {
-        return Promise.reject(options.error);
-      }
-      return Promise.resolve({
-        text: options.text ?? "",
-        inputTokens: options.inputTokens ?? 0,
-        outputTokens: options.outputTokens ?? 0,
-      });
-    },
-  };
-}
+import type { Io } from "../src/types";
 
 export interface FakeIoOptions {
   stdin?: string | (() => Promise<string>);
   files?: Record<string, string>;
-  env?: Record<string, string | undefined>;
   bunVersion?: string;
   which?: (command: string) => Promise<string | null>;
-  llm?: LlmClient;
-  now?: () => number;
 }
 
 export interface FakeIo extends Io {
@@ -58,11 +31,8 @@ export function makeIo(options: FakeIoOptions = {}): FakeIo {
     writeError: (text: string) => {
       io.err += text;
     },
-    env: options.env ?? {},
-    now: options.now ?? ((): number => 0),
     bunVersion: options.bunVersion ?? "1.0.0-test",
     which: options.which ?? ((): Promise<string | null> => Promise.resolve("/usr/bin/git")),
-    createLlm: () => options.llm ?? fakeLlm(),
   };
   return io;
 }

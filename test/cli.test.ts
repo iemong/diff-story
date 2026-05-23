@@ -12,11 +12,8 @@ describe("parseCliArgs", () => {
       version: false,
       json: false,
       jsonSchema: false,
-      rawPrompt: false,
-      dryRun: false,
+      chapters: undefined,
       chaptersJson: undefined,
-      model: undefined,
-      maxTokens: undefined,
     });
   });
 
@@ -26,29 +23,22 @@ describe("parseCliArgs", () => {
 
   test("parses boolean and string flags", () => {
     const parsed = parseCliArgs([
-      "analyze",
+      "format",
       "--json",
       "--json-schema",
-      "--raw-prompt",
-      "--dry-run",
+      "--chapters",
+      '{"chapters":[]}',
       "--chapters-json",
       "ch.json",
-      "--model",
-      "claude-x",
-      "--max-tokens",
-      "512",
     ]);
-    expect(parsed.command).toBe("analyze");
+    expect(parsed.command).toBe("format");
     expect(parsed.flags).toEqual({
       help: false,
       version: false,
       json: true,
       jsonSchema: true,
-      rawPrompt: true,
-      dryRun: true,
+      chapters: '{"chapters":[]}',
       chaptersJson: "ch.json",
-      model: "claude-x",
-      maxTokens: "512",
     });
   });
 
@@ -63,30 +53,22 @@ describe("parseCliArgs", () => {
 });
 
 describe("doctor", () => {
-  test("passes when key, parse-diff, and git are all healthy", async () => {
-    const io = makeIo({ env: { ANTHROPIC_API_KEY: "sk-test" }, bunVersion: "1.2.3" });
+  test("passes when parse-diff and git are healthy", async () => {
+    const io = makeIo({ bunVersion: "1.2.3" });
     const { checks, code } = await runDoctorChecks(io);
     expect(code).toBe(0);
     expect(checks).toEqual([
-      { name: "ANTHROPIC_API_KEY", ok: true, detail: "set" },
       { name: "Bun runtime", ok: true, detail: "1.2.3" },
       { name: "parse-diff", ok: true, detail: "working" },
       { name: "git", ok: true, detail: "/usr/bin/git" },
     ]);
   });
 
-  test("fails when the API key is missing and git is absent", async () => {
-    const io = makeIo({ env: {}, which: () => Promise.resolve(null) });
+  test("fails when git is absent", async () => {
+    const io = makeIo({ which: () => Promise.resolve(null) });
     const { checks, code } = await runDoctorChecks(io);
     expect(code).toBe(1);
-    expect(checks[0]).toEqual({ name: "ANTHROPIC_API_KEY", ok: false, detail: "not set" });
-    expect(checks[3]).toEqual({ name: "git", ok: false, detail: "not found in PATH" });
-  });
-
-  test("treats an empty-string API key as not set", async () => {
-    const io = makeIo({ env: { ANTHROPIC_API_KEY: "" } });
-    const { checks } = await runDoctorChecks(io);
-    expect(checks[0].ok).toBe(false);
+    expect(checks[2]).toEqual({ name: "git", ok: false, detail: "not found in PATH" });
   });
 
   test("renderDoctor marks each check with ✓ or ✗", () => {

@@ -1,6 +1,28 @@
 import { Errors } from "../errors";
 import type { Chapter, DiffFile } from "../types";
 
+/** JSON Schema for the chapters an agent must produce and hand back to `format`. */
+export const CHAPTERS_SCHEMA = {
+  $schema: "http://json-schema.org/draft-07/schema#",
+  title: "diff-story chapters",
+  type: "object",
+  required: ["chapters"],
+  properties: {
+    chapters: {
+      type: "array",
+      items: {
+        type: "object",
+        required: ["title", "synopsis", "files"],
+        properties: {
+          title: { type: "string" },
+          synopsis: { type: "string" },
+          files: { type: "array", items: { type: "string" } },
+        },
+      },
+    },
+  },
+} as const;
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
@@ -28,6 +50,18 @@ export function validateChapterArray(value: unknown): Chapter[] {
   });
 }
 
+/** Parse a chapters JSON string (a bare array or `{ chapters: [...] }`) into chapters. */
+export function parseChaptersJson(text: string): Chapter[] {
+  let value: unknown;
+  try {
+    value = JSON.parse(text);
+  } catch (error) {
+    throw Errors.invalidChaptersJson(error instanceof Error ? error.message : String(error));
+  }
+  const candidate = Array.isArray(value) ? value : isRecord(value) ? value.chapters : undefined;
+  return validateChapterArray(candidate);
+}
+
 /** Drop file references the diff does not contain, and chapters left empty. */
 export function pruneUnknownFiles(chapters: Chapter[], files: DiffFile[]): Chapter[] {
   const known = new Set(files.map((file) => file.path));
@@ -50,8 +84,13 @@ export function appendLeftovers(chapters: Chapter[], files: DiffFile[]): Chapter
     ...chapters,
     {
       title: "Appendix — unsorted changes",
-      synopsis: "Files the analysis did not assign to a chapter.",
+      synopsis: "Files not assigned to a chapter.",
       files: leftovers,
     },
   ];
+}
+
+/** Normalize agent-supplied chapters against the diff: prune unknowns, append leftovers. */
+export function reconcileChapters(chapters: Chapter[], files: DiffFile[]): Chapter[] {
+  return appendLeftovers(pruneUnknownFiles(chapters, files), files);
 }

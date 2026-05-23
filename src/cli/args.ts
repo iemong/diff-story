@@ -6,11 +6,8 @@ export interface CliFlags {
   version: boolean;
   json: boolean;
   jsonSchema: boolean;
-  rawPrompt: boolean;
-  dryRun: boolean;
+  chapters?: string;
   chaptersJson?: string;
-  model?: string;
-  maxTokens?: string;
 }
 
 export interface ParsedCli {
@@ -23,11 +20,8 @@ const OPTIONS = {
   version: { type: "boolean", short: "v" },
   json: { type: "boolean" },
   "json-schema": { type: "boolean" },
-  "raw-prompt": { type: "boolean" },
-  "dry-run": { type: "boolean" },
+  chapters: { type: "string" },
   "chapters-json": { type: "string" },
-  model: { type: "string" },
-  "max-tokens": { type: "string" },
 } as const;
 
 /** Parse argv into a command + normalized flags, or throw a DiffStoryError. */
@@ -47,11 +41,8 @@ export function parseCliArgs(argv: string[]): ParsedCli {
       version: values.version === true,
       json: values.json === true,
       jsonSchema: values["json-schema"] === true,
-      rawPrompt: values["raw-prompt"] === true,
-      dryRun: values["dry-run"] === true,
+      chapters: values.chapters,
       chaptersJson: values["chapters-json"],
-      model: values.model,
-      maxTokens: values["max-tokens"],
     },
   };
 }

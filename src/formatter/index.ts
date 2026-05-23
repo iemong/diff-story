@@ -1,4 +1,4 @@
-import type { AnalysisResult, Chapter, DiffFile } from "../types";
+import type { Chapter, DiffFile } from "../types";
 
 const BAR = "═".repeat(60);
 const SYNOPSIS_WIDTH = 72;
@@ -58,59 +58,15 @@ export function formatStory(files: DiffFile[], chapters: Chapter[]): string {
   return `${blocks.join("\n\n")}\n`;
 }
 
-/** JSON Schema describing the `--json` output. */
-export const OUTPUT_JSON_SCHEMA = {
-  $schema: "http://json-schema.org/draft-07/schema#",
-  title: "diff-story output",
-  type: "object",
-  required: ["chapters", "stats"],
-  properties: {
-    chapters: {
-      type: "array",
-      items: {
-        type: "object",
-        required: ["title", "synopsis", "files"],
-        properties: {
-          title: { type: "string" },
-          synopsis: { type: "string" },
-          files: {
-            type: "array",
-            items: {
-              type: "object",
-              required: ["path", "additions", "deletions", "binary"],
-              properties: {
-                path: { type: "string" },
-                additions: { type: "integer" },
-                deletions: { type: "integer" },
-                binary: { type: "boolean" },
-              },
-            },
-          },
-        },
-      },
-    },
-    stats: {
-      type: "object",
-      required: ["inputTokens", "outputTokens", "durationMs", "model"],
-      properties: {
-        inputTokens: { type: "integer" },
-        outputTokens: { type: "integer" },
-        durationMs: { type: "integer" },
-        model: { type: "string" },
-      },
-    },
-  },
-} as const;
-
 /** Serialize parsed files as JSON (the `parse` command output). */
 export function formatFilesJson(files: DiffFile[]): string {
   return `${JSON.stringify({ files }, null, 2)}\n`;
 }
 
-/** Serialize an analysis result as JSON (the `--json` / `analyze` output). */
-export function formatJson(result: AnalysisResult, files: DiffFile[]): string {
+/** Serialize the resolved story as JSON (the `format --json` output). */
+export function formatJson(chapters: Chapter[], files: DiffFile[]): string {
   const byPath = new Map(files.map((file) => [file.path, file]));
-  const chapters = result.chapters.map((chapter) => ({
+  const enriched = chapters.map((chapter) => ({
     title: chapter.title,
     synopsis: chapter.synopsis,
     files: chapter.files.map((path) => {
@@ -123,10 +79,5 @@ export function formatJson(result: AnalysisResult, files: DiffFile[]): string {
       };
     }),
   }));
-  return `${JSON.stringify({ chapters, stats: result.stats }, null, 2)}\n`;
-}
-
-/** Serialize the output JSON Schema (the `--json-schema` output). */
-export function formatSchema(): string {
-  return `${JSON.stringify(OUTPUT_JSON_SCHEMA, null, 2)}\n`;
+  return `${JSON.stringify({ chapters: enriched }, null, 2)}\n`;
 }

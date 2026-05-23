@@ -2,14 +2,14 @@
 
 > Every PR tells a story. Read your diff like a book.
 
-`diff-story` is a Unix filter that reorders a pull-request diff into an AI-analyzed
-sequence of **chapters**. Pipe a `git diff` in; get the same diff back, grouped
-under chapter banners that tell the story of the change — earlier chapters set up
-the context that later ones build on.
+`diff-story` reorders a pull-request diff into an ordered sequence of
+**chapters** so a reviewer reads the change like a narrative — earlier chapters
+set up the context that later ones build on.
 
-```bash
-git diff main..feature | diff-story
-```
+It is a **deterministic Unix filter that never calls a model.** The agent
+driving it (Claude Code, Codex, Cursor, …) is the intelligence: the tool hands
+the agent a plan, the agent decides the chapters, and the tool renders them. No
+API key, no network, no cost inside the tool.
 
 ```diff
 # ════════════════════════════════════════════════════════════
@@ -22,69 +22,72 @@ diff --git a/src/api/types.ts b/src/api/types.ts
 ...
 ```
 
-It is built **AI-agent-first**: the primary user is a coding agent, with humans a
-close second. That shows up everywhere — machine-readable output, a published
-schema, a `doctor` self-check, and errors that always explain What / Why / How.
-
 ## Install
 
 ```bash
 bun install -g diff-story    # or run from a clone: bun run start < diff.patch
 ```
 
-Requires [Bun](https://bun.sh) — the executable runs under `bun` via its
-shebang. Analysis uses the Claude API, so set `ANTHROPIC_API_KEY` (commands that
-don't call the model don't need it).
+Requires [Bun](https://bun.sh) — the executable runs under `bun` via its shebang.
 
-## Usage
+## How it works (the agent protocol)
 
 ```bash
-git diff main..feature | diff-story                 # annotated story
-git diff | diff-story --json | jq '.chapters[].title'  # machine-readable JSON
-git diff | diff-story --json-schema                 # the output schema
-git diff | diff-story --dry-run                     # no model call; one chapter
-git diff | diff-story --raw-prompt                  # print the prompt; no model call
-git diff | diff-story parse                         # parsed files as JSON (no key)
-diff-story doctor                                   # check the environment
+# 1. Ask for the plan: the files to group + the JSON shape to produce.
+git diff main..feature | diff-story
+
+# 2. (the agent decides the chapters as JSON)
+
+# 3. Render the story by handing the chapters back.
+git diff main..feature | diff-story format \
+  --chapters '{"chapters":[{"title":"Setup","synopsis":"…","files":["src/a.ts"]}]}'
 ```
 
-### Commands
+Omitted files are appended as an "Appendix" chapter, so nothing is lost. Run
+`diff-story --json-schema` for the formal chapters schema.
 
-| Command                               | Needs key | Description                                  |
-| ------------------------------------- | --------- | -------------------------------------------- |
-| `diff-story` (default)                | yes       | Analyze and print the annotated story.       |
-| `diff-story analyze`                  | yes       | Analyze and print chapters as JSON.          |
-| `diff-story parse`                    | no        | Parse the diff into files as JSON.           |
-| `diff-story format --chapters-json F` | no        | Re-emit the diff using chapters you supply.  |
-| `diff-story doctor`                   | no        | Check API key, git, parse-diff, and runtime. |
+## Commands
+
+| Command                                  | Description                                  |
+| ---------------------------------------- | -------------------------------------------- |
+| `diff-story` / `diff-story plan`         | Print the plan: files + chapters to produce. |
+| `diff-story format --chapters '<json>'`  | Render the story from inline chapters.       |
+| `diff-story format --chapters-json PATH` | Render the story from a chapters file.       |
+| `diff-story parse`                       | Parse the diff into files as JSON.           |
+| `diff-story doctor`                      | Check git, parse-diff, and the runtime.      |
 
 ### Options
 
-| Flag                   | Description                                              |
-| ---------------------- | -------------------------------------------------------- |
-| `--json`               | Emit machine-readable JSON instead of an annotated diff. |
-| `--json-schema`        | Print the JSON output schema and exit.                   |
-| `--raw-prompt`         | Print the exact prompt that would be sent, then exit.    |
-| `--dry-run`            | Skip the model; emit a single chapter with every file.   |
-| `--chapters-json PATH` | Use chapters from `PATH` and skip the model.             |
-| `--model NAME`         | Override the model id (default `claude-sonnet-4-6`).     |
-| `--max-tokens N`       | Max output tokens (default `2048`).                      |
-| `-h, --help`           | Show help. `-v, --version` prints the version.           |
+| Flag                   | Description                                      |
+| ---------------------- | ------------------------------------------------ |
+| `--chapters JSON`      | (format) Chapters as an inline JSON string.      |
+| `--chapters-json PATH` | (format) Chapters from a JSON file.              |
+| `--json`               | (format) Emit JSON instead of an annotated diff. |
+| `--json-schema`        | Print the chapters JSON schema and exit.         |
+| `-h, --help`           | Show help. `-v, --version` prints the version.   |
 
 `stdout` carries the result, `stderr` the diagnostics, and the exit code is `0`
 on success / `1` on any error. Errors print a stable code (`DS_Exxx`) plus a
 What / Why / How block.
 
-## How it works
+## Use as a library
 
-```
-raw diff ──parser──▶ DiffFile[] ──analyzer──▶ Chapter[] ──formatter──▶ output
-                                    (LLM)
-```
+The portable core is published to JSR with no model dependency:
 
-Only the analyzer touches the model, behind a one-method `LlmClient` interface,
-so the model — or the whole provider — can change without touching the Unix I/O
-contract. See [`docs/spec.md`](./docs/spec.md) and [`CLAUDE.md`](./CLAUDE.md).
+```ts
+import {
+  parseUnifiedDiff,
+  buildPlan,
+  parseChaptersJson,
+  reconcileChapters,
+  formatStory,
+} from "@iemong/diff-story";
+
+const files = parseUnifiedDiff(rawDiff);
+const plan = buildPlan(files); // hand this to your agent
+const chapters = reconcileChapters(parseChaptersJson(agentJson), files);
+const story = formatStory(files, chapters);
+```
 
 ## Development
 

@@ -19,11 +19,11 @@ describe("DiffStoryError", () => {
   });
 
   test("format renders a What/Why/How block with the code", () => {
-    const error = Errors.llmCallFailed("network down");
+    const error = Errors.invalidChaptersJson("bad shape");
     const text = error.format();
-    expect(text).toContain("(DS_E004)");
+    expect(text).toContain("(DS_E011)");
     expect(text).toContain("What:");
-    expect(text).toContain("Why:   network down");
+    expect(text).toContain("Why:   bad shape");
     expect(text).toContain("How:");
     expect(text.startsWith("✗ ")).toBe(true);
   });
@@ -33,13 +33,9 @@ describe("Errors catalog", () => {
   const cases: Array<[string, DiffStoryError]> = [
     ["DS_E001", Errors.emptyInput()],
     ["DS_E002", Errors.noDiffFound()],
-    ["DS_E003", Errors.missingApiKey()],
-    ["DS_E004", Errors.llmCallFailed("x")],
-    ["DS_E005", Errors.invalidLlmResponse("x")],
-    ["DS_E006", Errors.invalidMaxTokens("abc")],
     ["DS_E007", Errors.badArguments("x")],
     ["DS_E008", Errors.unknownCommand("nope")],
-    ["DS_E009", Errors.missingChaptersJson()],
+    ["DS_E009", Errors.missingChapters()],
     ["DS_E010", Errors.chaptersFileUnreadable("/p", "x")],
     ["DS_E011", Errors.invalidChaptersJson("x")],
     ["DS_E999", Errors.unexpected("x")],
@@ -57,8 +53,7 @@ describe("Errors catalog", () => {
     expect(new Set(codes).size).toBe(codes.length);
   });
 
-  test("invalidMaxTokens and chaptersFileUnreadable embed their arguments", () => {
-    expect(Errors.invalidMaxTokens("abc").what).toContain("abc");
+  test("chaptersFileUnreadable and unknownCommand embed their arguments", () => {
     expect(Errors.chaptersFileUnreadable("/tmp/x.json", "boom").what).toContain("/tmp/x.json");
     expect(Errors.unknownCommand("frobnicate").what).toContain("frobnicate");
   });

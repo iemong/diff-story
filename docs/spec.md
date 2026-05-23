@@ -2,24 +2,41 @@
 
 ## 1. Contract
 
-diff-story is a Unix filter.
+diff-story is a **deterministic** Unix filter. It never calls a model — the
+agent driving it supplies the chapter grouping.
 
 - **Input:** a unified diff on stdin (typically `git diff` output).
-- **Output:** on stdout, either an annotated diff (default) or JSON (`--json`).
+- **Output:** on stdout — a plan, parsed files, or an annotated story / JSON.
 - **Diagnostics:** human-readable error blocks on stderr.
 - **Exit codes:** `0` success, `1` any error.
 
-The I/O contract is the part that must never change. The model behind the
-analysis is an implementation detail hidden behind `LlmClient`.
+The I/O contract is the part that must never change. The intelligence lives
+entirely in the calling agent, so the tool has no model, key, or network
+dependency.
 
-## 2. Pipeline
+## 2. The agent protocol
 
 ```
-raw diff ──parser──▶ DiffFile[] ──analyzer──▶ Chapter[] ──formatter──▶ output
-                                    (LLM)
+            ┌──────────────── agent decides chapters ────────────────┐
+            │                                                         ▼
+git diff ─▶ diff-story (plan) ─▶ {chapters JSON} ─▶ diff-story format ─▶ story
 ```
 
-### 2.1 Parser (`src/parser`)
+1. **plan** (default command): `git diff | diff-story` prints the file manifest
+   and the chapters JSON shape to produce.
+2. The agent groups every file into an ordered narrative and emits chapters JSON.
+3. **format**: `git diff | diff-story format --chapters '<json>'` re-emits the
+   diff grouped under chapter banners (or JSON with `--json`).
+
+## 3. Pipeline
+
+```
+raw diff ──parser──▶ DiffFile[] ──plan──▶ agent request (text)
+                          │
+                          └──(agent JSON)──▶ chapters ──formatter──▶ output
+```
+
+### 3.1 Parser (`src/parser`)
 
 `parse-diff` is the validity gate (non-empty input that yields zero files is a
 `DS_E002` error). Our own splitter produces the verbatim per-file segments:
@@ -32,81 +49,58 @@ Each `DiffFile` carries `from`, `to`, a display `path` (prefers `to`, falls back
 to `from` for deletes), `additions`/`deletions` counts, a `binary` flag, and the
 verbatim `rawText`.
 
-### 2.2 Analyzer (`src/analyzer`) — the only LLM stage
+### 3.2 Plan (`src/plan`)
 
-1. `buildUserPrompt` renders a manifest: each file's path, +/- counts, and a
-   (truncated) copy of its diff.
-2. The model is asked to return JSON: an ordered array of chapters, each with a
-   `title`, a `synopsis`, and the list of file paths it owns, using each path
-   exactly once.
-3. `parseChapterResponse` extracts the JSON (tolerating prose or ```json
-   fences), validates the shape, drops references to unknown files, and appends
-   any unassigned files as a trailing **Appendix** chapter so nothing is lost.
+`buildPlan(files)` renders the request the agent fulfils: the numbered file
+manifest plus the chapters JSON shape and the `format` command to call back.
+There is no model call — this is just an instruction string.
 
-The provider is abstracted to one method:
+### 3.3 Chapters (`src/chapters`)
 
-```ts
-interface LlmClient {
-  complete(req: { system; user; model; maxTokens }): Promise<{ text; inputTokens; outputTokens }>;
-}
-```
+`parseChaptersJson` accepts a bare array or `{ chapters: [...] }`,
+`validateChapterArray` enforces the `{title, synopsis, files[]}` shape, and
+`reconcileChapters` drops references to unknown files and appends any unassigned
+files as a trailing **Appendix** chapter so nothing is lost. `CHAPTERS_SCHEMA`
+is the published JSON Schema (`--json-schema`).
 
-`createAnthropicClient` adapts the Anthropic SDK to it. Swapping providers means
-implementing `LlmClient`; nothing else changes.
-
-#### Prompt (shape)
-
-- **System:** establishes the "narrative of chapters" task.
-- **User:** the file manifest + the JSON response instruction.
-
-Prompts live in `src/analyzer/prompt.ts` so they are versioned, diffable, and
-unit-tested — the design is externalized, not implicit.
-
-### 2.3 Formatter (`src/formatter`)
+### 3.4 Formatter (`src/formatter`)
 
 - `formatStory` emits, per chapter, a `#`-prefixed banner (number, title,
   wrapped synopsis) followed by the verbatim diffs of that chapter's files.
-- `formatJson` emits the machine-readable result; its schema is published by
-  `--json-schema` (`OUTPUT_JSON_SCHEMA`).
+- `formatJson` emits the resolved story (chapters with per-file stats).
+- `formatFilesJson` backs the `parse` command.
 
-## 3. Commands & flags
+## 4. Commands & flags
 
-| Command / flag             | LLM | Purpose                                            |
-| -------------------------- | --- | -------------------------------------------------- |
-| default                    | ✓   | Analyze → annotated story (or JSON with `--json`). |
-| `parse`                    | ✗   | Parse the diff to `{ files: [...] }` JSON.         |
-| `analyze`                  | ✓   | Analyze → `{ chapters, stats }` JSON.              |
-| `format --chapters-json F` | ✗   | Re-emit using supplied chapters.                   |
-| `doctor`                   | ✗   | Environment self-check.                            |
-| `--dry-run`                | ✗   | One chapter containing every file.                 |
-| `--raw-prompt`             | ✗   | Print the exact prompt; exit.                      |
-| `--json-schema`            | ✗   | Print the output schema; exit.                     |
-| `--model`, `--max-tokens`  | –   | Override model id / output budget.                 |
+| Command / flag             | Purpose                                          |
+| -------------------------- | ------------------------------------------------ |
+| default / `plan`           | Print the plan (manifest + chapters to produce). |
+| `format --chapters JSON`   | Render the story from inline chapters JSON.      |
+| `format --chapters-json F` | Render the story from a chapters file.           |
+| `format … --json`          | Emit the resolved story as JSON.                 |
+| `parse`                    | Parse the diff to `{ files: [...] }` JSON.       |
+| `doctor`                   | Environment self-check (git, parse-diff, Bun).   |
+| `--json-schema`            | Print the chapters JSON schema; exit.            |
 
-Model id resolution: `--model` › `DIFF_STORY_MODEL` › default
-(`claude-sonnet-4-6`).
+Inline `--chapters` takes precedence over `--chapters-json`.
 
-## 4. Errors
+## 5. Errors
 
 Every failure is a `DiffStoryError` with a stable code and a What / Why / How
 triple. The catalog (`src/errors/index.ts`):
 
-| Code      | Meaning                                   |
-| --------- | ----------------------------------------- |
-| `DS_E001` | No diff on stdin.                         |
-| `DS_E002` | Input is not a recognizable diff.         |
-| `DS_E003` | `ANTHROPIC_API_KEY` not set.              |
-| `DS_E004` | Model request failed.                     |
-| `DS_E005` | Model response could not be parsed.       |
-| `DS_E006` | `--max-tokens` is not a positive integer. |
-| `DS_E007` | Could not parse CLI arguments.            |
-| `DS_E008` | Unknown command.                          |
-| `DS_E009` | `format` requires `--chapters-json`.      |
-| `DS_E010` | Chapters file unreadable.                 |
-| `DS_E011` | Chapters JSON is invalid.                 |
-| `DS_E999` | Unexpected error.                         |
+| Code      | Meaning                                           |
+| --------- | ------------------------------------------------- |
+| `DS_E001` | No diff on stdin.                                 |
+| `DS_E002` | Input is not a recognizable diff.                 |
+| `DS_E007` | Could not parse CLI arguments.                    |
+| `DS_E008` | Unknown command.                                  |
+| `DS_E009` | `format` requires `--chapters`/`--chapters-json`. |
+| `DS_E010` | Chapters file unreadable.                         |
+| `DS_E011` | Chapters JSON is invalid.                         |
+| `DS_E999` | Unexpected error.                                 |
 
-## 5. Quality
+## 6. Quality
 
 - 100% line + function coverage (`coverageThreshold = 1.0`).
 - Mutation testing via Stryker, break threshold 70.

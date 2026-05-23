@@ -56,38 +56,6 @@ export const Errors = {
       how: "Make sure you pipe `git diff` output, not a commit message or plain text",
     }),
 
-  missingApiKey: (): DiffStoryError =>
-    new DiffStoryError({
-      code: "DS_E003",
-      what: "ANTHROPIC_API_KEY is not set",
-      why: "Analysis calls the Claude API, which requires an API key",
-      how: "Export ANTHROPIC_API_KEY, or run with --dry-run / --chapters-json to skip the model",
-    }),
-
-  llmCallFailed: (detail: string): DiffStoryError =>
-    new DiffStoryError({
-      code: "DS_E004",
-      what: "The model request failed",
-      why: detail,
-      how: "Check your network and ANTHROPIC_API_KEY, then run `diff-story doctor`",
-    }),
-
-  invalidLlmResponse: (detail: string): DiffStoryError =>
-    new DiffStoryError({
-      code: "DS_E005",
-      what: "The model response could not be parsed into chapters",
-      why: detail,
-      how: "Retry; if it persists, lower --max-tokens or try a different --model",
-    }),
-
-  invalidMaxTokens: (value: string): DiffStoryError =>
-    new DiffStoryError({
-      code: "DS_E006",
-      what: `--max-tokens "${value}" is not a positive integer`,
-      why: "The model needs a positive integer output-token budget",
-      how: "Pass a positive integer, e.g. --max-tokens 2048",
-    }),
-
   badArguments: (detail: string): DiffStoryError =>
     new DiffStoryError({
       code: "DS_E007",
@@ -104,12 +72,12 @@ export const Errors = {
       how: "Use one of: parse, analyze, format, doctor, help — or run `diff-story --help`",
     }),
 
-  missingChaptersJson: (): DiffStoryError =>
+  missingChapters: (): DiffStoryError =>
     new DiffStoryError({
       code: "DS_E009",
-      what: "The format command requires --chapters-json",
+      what: "The format command requires --chapters or --chapters-json",
       why: "format re-emits a diff using chapters you supply; there is nothing to format without them",
-      how: "Pass --chapters-json <path> pointing at a chapters JSON file",
+      how: "Run `diff-story plan` to get the chapters to produce, then pass them with --chapters '<json>' or --chapters-json <path>",
     }),
 
   chaptersFileUnreadable: (path: string, detail: string): DiffStoryError =>

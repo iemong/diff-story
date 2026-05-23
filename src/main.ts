@@ -1,5 +1,6 @@
+import { CHAPTERS_SCHEMA } from "./chapters";
 import { parseCliArgs } from "./cli/args";
-import { runAnalyze, runDefault, runFormat, runParse } from "./cli/commands";
+import { runFormat, runParse, runPlan } from "./cli/commands";
 import { renderDoctor, runDoctorChecks } from "./cli/doctor";
 import { HELP } from "./cli/help";
 import { DiffStoryError, Errors } from "./errors";
@@ -28,14 +29,17 @@ export async function main(argv: string[], io: Io): Promise<number> {
       io.write(`${VERSION}\n`);
       return 0;
     }
+    if (flags.jsonSchema) {
+      io.write(`${JSON.stringify(CHAPTERS_SCHEMA, null, 2)}\n`);
+      return 0;
+    }
 
     switch (command) {
       case "default":
-        return await runDefault(flags, io);
+      case "plan":
+        return await runPlan(io);
       case "parse":
         return await runParse(io);
-      case "analyze":
-        return await runAnalyze(flags, io);
       case "format":
         return await runFormat(flags, io);
       case "doctor": {
