@@ -1,0 +1,18 @@
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "plugins": ["typescript", "unicorn", "oxc"],
+  "categories": {
+    "correctness": "error",
+    "suspicious": "error",
+    "perf": "error",
+    "style": "error",
+    "pedantic": "error"
+  },
+  "rules": {
+    "complexity": ["error", 15],
+    "max-params": ["error", 4],
+    "max-statements": "off",
+    "max-lines-per-function": "off"
+  },
+  "ignorePatterns": ["node_modules", ".stryker-tmp", "coverage", "reports", "dist"]
+}

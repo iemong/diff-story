@@ -1,0 +1,17 @@
+pre-commit:
+  parallel: true
+  jobs:
+    - name: format
+      glob: "*.{ts,js,json,md}"
+      run: bunx oxfmt --check {staged_files}
+    - name: lint
+      glob: "*.{ts,js}"
+      run: bunx oxlint {staged_files}
+    - name: typecheck
+      glob: "*.ts"
+      run: bun run typecheck
+
+pre-push:
+  jobs:
+    - name: test
+      run: bun test

@@ -1,0 +1,4 @@
+# Used by Stryker's command runner: same tests, but without the coverage gate,
+# so mutation results are not skewed by coverage-threshold failures.
+[test]
+coverage = false

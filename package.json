@@ -1,0 +1,57 @@
+{
+  "name": "diff-story",
+  "version": "0.1.0",
+  "description": "Unix filter that reorders a PR diff into AI-analyzed chapters — read your diff like a book.",
+  "keywords": [
+    "ai",
+    "claude",
+    "cli",
+    "code-review",
+    "diff",
+    "git",
+    "pull-request",
+    "unix-filter"
+  ],
+  "homepage": "https://github.com/iemong/diff-story",
+  "license": "MIT",
+  "author": "iemong",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/iemong/diff-story.git"
+  },
+  "bin": {
+    "diff-story": "bin/diff-story.ts"
+  },
+  "files": [
+    "bin",
+    "src",
+    ".github/skills/diff-story/SKILL.md",
+    "README.md",
+    "LICENSE"
+  ],
+  "type": "module",
+  "scripts": {
+    "start": "bun run bin/diff-story.ts",
+    "test": "bun test",
+    "test:cov": "bun test --coverage",
+    "typecheck": "tsc --noEmit",
+    "lint": "oxlint",
+    "lint:fix": "oxlint --fix",
+    "format": "oxfmt .",
+    "format:check": "oxfmt --check .",
+    "mutation": "stryker run",
+    "check": "bun run typecheck && bun run lint && bun run format:check && bun run test:cov",
+    "prepare": "lefthook install"
+  },
+  "dependencies": {
+    "parse-diff": "0.12.0"
+  },
+  "devDependencies": {
+    "@stryker-mutator/core": "9.6.1",
+    "@types/bun": "1.3.14",
+    "lefthook": "2.1.8",
+    "oxfmt": "0.51.0",
+    "oxlint": "1.66.0",
+    "typescript": "6.0.3"
+  }
+}

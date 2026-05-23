@@ -1,0 +1,28 @@
+name: Publish to JSR
+
+# Tag a release (e.g. `git tag v0.1.0 && git push --tags`) to publish.
+# Uses JSR's tokenless OIDC publishing — no secrets required, but the package
+# @iemong/diff-story must already be linked to this repo on jsr.io.
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: "1.3.11"
+      - run: bun install --frozen-lockfile
+      - name: Verify before publishing
+        run: |
+          bun run typecheck
+          bun test --coverage
+      - name: Publish
+        run: npx jsr publish

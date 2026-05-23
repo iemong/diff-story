@@ -1,0 +1,7 @@
+[test]
+coverage = true
+coverageThreshold = 1.0
+coverageReporter = ["text", "lcov"]
+coverageSkipTestFiles = true
+coverageDir = "coverage"
+coveragePathIgnorePatterns = ["bin/", "src/io.ts", "test/"]
