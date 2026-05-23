@@ -25,7 +25,7 @@
   "files": [
     "bin",
     "src",
-    "SKILL.md",
+    ".github/skills/diff-story/SKILL.md",
     "README.md",
     "LICENSE"
   ],
