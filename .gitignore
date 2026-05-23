@@ -4,4 +4,4 @@ reports/
 .stryker-tmp/
 *.log
 dist/
-diff-story
+/diff-story
