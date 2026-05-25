@@ -10,6 +10,7 @@ export interface CliFlags {
   jsonSchema: boolean;
   chapters?: string;
   chaptersJson?: string;
+  agent?: string;
 }
 
 export interface ParsedCli {
@@ -18,6 +19,7 @@ export interface ParsedCli {
 }
 
 const OPTIONS = {
+  agent: { type: "string" },
   chapters: { type: "string" },
   "chapters-json": { type: "string" },
   help: { short: "h", type: "boolean" },
@@ -51,6 +53,7 @@ export const parseCliArgs = (argv: string[]): ParsedCli => {
   return {
     command,
     flags: {
+      agent: values.agent,
       chapters: values.chapters,
       chaptersJson: values["chapters-json"],
       help: values.help === true,

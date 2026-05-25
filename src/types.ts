@@ -26,11 +26,19 @@ export interface Chapter {
   files: string[];
 }
 
+/** The outcome of running an external agent CLI: its captured streams + exit code. */
+export interface AgentResult {
+  stdout: string;
+  stderr: string;
+  exitCode: number;
+}
+
 /**
  * Every side effect the CLI needs, injected so the core logic stays pure and
  * testable. The production wiring lives in `src/io.ts`. There is no model
- * client here: diff-story is a deterministic filter and the calling agent is
- * the intelligence.
+ * client here: `runAgent` is a generic subprocess runner, and the `--auto`
+ * escape hatch points it at the user's own agent CLI — diff-story itself
+ * stays a deterministic filter with no model, key, or network of its own.
  */
 export interface Io {
   readStdin(): Promise<string>;
@@ -39,4 +47,5 @@ export interface Io {
   writeError(text: string): void;
   bunVersion: string;
   which(command: string): Promise<string | undefined>;
+  runAgent(command: string, args: string[], input: string): Promise<AgentResult>;
 }

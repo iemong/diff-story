@@ -40,6 +40,8 @@ describe("Errors catalog", () => {
     ["DS_E009", Errors.missingChapters()],
     ["DS_E010", Errors.chaptersFileUnreadable("/p", "x")],
     ["DS_E011", Errors.invalidChaptersJson("x")],
+    ["DS_E020", Errors.agentNotFound("claude, codex")],
+    ["DS_E021", Errors.agentFailed("claude", "boom")],
     ["DS_E999", Errors.unexpected("x")],
   ];
 
@@ -58,5 +60,10 @@ describe("Errors catalog", () => {
   test("chaptersFileUnreadable and unknownCommand embed their arguments", () => {
     expect(Errors.chaptersFileUnreadable("/tmp/x.json", "boom").what).toContain("/tmp/x.json");
     expect(Errors.unknownCommand("frobnicate").what).toContain("frobnicate");
+  });
+
+  test("agent errors embed the command and the attempted list", () => {
+    expect(Errors.agentFailed("claude", "boom").what).toContain("claude");
+    expect(Errors.agentNotFound("claude, codex").why).toContain("codex");
   });
 });

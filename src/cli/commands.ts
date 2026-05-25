@@ -1,4 +1,5 @@
 import type { Chapter, DiffFile, Io } from "../types";
+import { buildAutoPrompt, detectAgent, extractJsonText } from "../agent";
 import { formatFilesJson, formatJson, formatStory } from "../formatter";
 import { parseChaptersJson, reconcileChapters } from "../chapters";
 import type { CliFlags } from "./args";
@@ -7,6 +8,7 @@ import { buildPlan } from "../plan";
 import { parseUnifiedDiff } from "../parser";
 
 const OK = 0;
+const WARN_PROMPT_BYTES = 100_000;
 
 const readFiles = async (io: Io): Promise<DiffFile[]> => parseUnifiedDiff(await io.readStdin());
 
@@ -45,14 +47,43 @@ export const runParse = async (io: Io): Promise<number> => {
   return OK;
 };
 
+const renderStory = (flags: CliFlags, files: DiffFile[], chapters: Chapter[]): string => {
+  if (flags.json) {
+    return formatJson(chapters, files);
+  }
+  return formatStory(files, chapters);
+};
+
 /** Re-emit the diff grouped under the chapters the agent supplies. */
 export const runFormat = async (flags: CliFlags, io: Io): Promise<number> => {
   const files = await readFiles(io);
   const chapters = await resolveChapters(flags, io, files);
-  let output = formatStory(files, chapters);
-  if (flags.json) {
-    output = formatJson(chapters, files);
+  io.write(renderStory(flags, files, chapters));
+  return OK;
+};
+
+/**
+ * `auto`: drive the whole protocol in one command. Detect the user's agent CLI,
+ * hand it the diff, and render the chapters it returns. diff-story stays a
+ * deterministic filter — the spawned agent is the intelligence.
+ */
+export const runAuto = async (flags: CliFlags, io: Io): Promise<number> => {
+  const raw = await io.readStdin();
+  const files = parseUnifiedDiff(raw);
+  const agent = await detectAgent(io, flags.agent);
+  const prompt = buildAutoPrompt(files, raw);
+  io.writeError(`diff-story: running ${agent.command}… (this can take a while)\n`);
+  if (prompt.length > WARN_PROMPT_BYTES) {
+    io.writeError(`diff-story: large prompt (${prompt.length} bytes); the agent may truncate it\n`);
   }
-  io.write(output);
+  const result = await io.runAgent(agent.command, agent.args, prompt);
+  if (result.exitCode !== OK) {
+    throw Errors.agentFailed(
+      agent.command,
+      result.stderr.trim() || `exited with code ${result.exitCode}`,
+    );
+  }
+  const chapters = reconcileChapters(parseChaptersJson(extractJsonText(result.stdout)), files);
+  io.write(renderStory(flags, files, chapters));
   return OK;
 };
