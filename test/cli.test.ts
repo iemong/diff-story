@@ -12,6 +12,7 @@ describe("parseCliArgs", () => {
     expect(parsed.flags).toEqual({
       chapters: undefined,
       chaptersJson: undefined,
+      fold: false,
       help: false,
       json: false,
       jsonSchema: false,
@@ -37,6 +38,7 @@ describe("parseCliArgs", () => {
     expect(parsed.flags).toEqual({
       chapters: '{"chapters":[]}',
       chaptersJson: "ch.json",
+      fold: false,
       help: false,
       json: true,
       jsonSchema: true,

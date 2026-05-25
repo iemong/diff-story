@@ -51,7 +51,7 @@ const renderStory = (flags: CliFlags, files: DiffFile[], chapters: Chapter[]): s
   if (flags.json) {
     return formatJson(chapters, files);
   }
-  return formatStory(files, chapters);
+  return formatStory(files, chapters, flags.fold);
 };
 
 /** Re-emit the diff grouped under the chapters the agent supplies. */

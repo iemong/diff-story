@@ -91,6 +91,34 @@ describe("formatStory", () => {
   });
 });
 
+describe("formatStory — fold", () => {
+  const lock = file("package-lock.json", {
+    rawText: "diff --git a/package-lock.json b/package-lock.json\n+huge\n",
+  });
+  const src = file("src/a.ts");
+  const chapters: Chapter[] = [
+    { files: ["package-lock.json", "src/a.ts"], synopsis: "s", title: "T" },
+  ];
+
+  test("folds noise files behind a one-line summary when fold is on", () => {
+    const story = formatStory([lock, src], chapters, true);
+    expect(story).toContain("# ── package-lock.json (lockfile)");
+    expect(story).toContain("folded");
+    expect(story).not.toContain("+huge");
+    expect(story).toContain("diff --git a/src/a.ts");
+  });
+
+  test("keeps every file verbatim when fold is off", () => {
+    const story = formatStory([lock, src], chapters, false);
+    expect(story).toContain("+huge");
+    expect(story).not.toContain("folded");
+  });
+
+  test("does not fold by default (fold is opt-in)", () => {
+    expect(formatStory([lock, src], chapters)).toContain("+huge");
+  });
+});
+
 describe("formatFilesJson", () => {
   test("wraps files under a files key", () => {
     const json = JSON.parse(formatFilesJson([file("a.ts")]));
@@ -122,5 +150,17 @@ describe("formatJson", () => {
       deletions: 0,
       path: "a.ts",
     });
+  });
+
+  test("tags noisy files with a noise kind", () => {
+    const json = JSON.parse(
+      formatJson([{ files: ["yarn.lock"], synopsis: "s", title: "T" }], [file("yarn.lock")]),
+    );
+    expect(json.chapters[FIRST].files[FIRST].noise).toBe("lockfile");
+  });
+
+  test("omits the noise key for signal files", () => {
+    const json = JSON.parse(formatJson(chapters, [file("a.ts")]));
+    expect(json.chapters[FIRST].files[FIRST]).not.toHaveProperty("noise");
   });
 });

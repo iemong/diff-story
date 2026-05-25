@@ -121,6 +121,25 @@ describe("main — format", () => {
     expect(io.out).toContain("Appendix");
     expect(io.out).toContain("src/b.ts");
   });
+
+  test("--fold collapses noise files behind a one-line summary", async () => {
+    const lockDiff = [
+      "diff --git a/yarn.lock b/yarn.lock",
+      "--- a/yarn.lock",
+      "+++ b/yarn.lock",
+      "@@ -1 +1 @@",
+      "-old",
+      "+new",
+      "",
+    ].join("\n");
+    const io = makeIo({ stdin: lockDiff });
+    await main(
+      ["format", "--fold", "--chapters", '[{"title":"Deps","synopsis":"s","files":["yarn.lock"]}]'],
+      io,
+    );
+    expect(io.out).toContain("(lockfile)");
+    expect(io.out).not.toContain("+new");
+  });
 });
 
 describe("main — doctor", () => {

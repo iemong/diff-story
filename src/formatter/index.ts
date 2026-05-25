@@ -1,4 +1,5 @@
 import type { Chapter, DiffFile } from "../types";
+import { type NoiseKind, classifyNoise } from "../noise";
 
 const BAR_WIDTH = 60;
 const SYNOPSIS_WIDTH = 72;
@@ -48,8 +49,26 @@ export const renderBanner = (index: number, total: number, chapter: Chapter): st
   ].join("\n");
 };
 
-/** Re-emit the diff grouped into chapters, each preceded by a banner. */
-export const formatStory = (files: DiffFile[], chapters: Chapter[]): string => {
+/** Collapse a noisy file to a single `#` summary line instead of its full diff. */
+const renderFoldedFile = (file: DiffFile, kind: NoiseKind): string =>
+  `# ── ${file.path} (${kind}) +${file.additions} -${file.deletions} · folded; omit --fold for the full diff`;
+
+const renderFileBlock = (file: DiffFile, fold: boolean): string => {
+  if (fold) {
+    const kind = classifyNoise(file);
+    if (kind !== undefined) {
+      return renderFoldedFile(file, kind);
+    }
+  }
+  return file.rawText.replace(/\s+$/u, "");
+};
+
+/**
+ * Re-emit the diff grouped into chapters, each preceded by a banner. When
+ * `fold` is set, low-signal files (lockfiles, generated output, renames,
+ * binaries) collapse to a one-line summary; omit it to keep every diff verbatim.
+ */
+export const formatStory = (files: DiffFile[], chapters: Chapter[], fold = false): string => {
   const byPath = new Map(files.map((file) => [file.path, file]));
   const blocks: string[] = [];
 
@@ -58,7 +77,7 @@ export const formatStory = (files: DiffFile[], chapters: Chapter[]): string => {
     for (const path of chapter.files) {
       const file = byPath.get(path);
       if (file !== undefined) {
-        blocks.push(file.rawText.replace(/\s+$/u, ""));
+        blocks.push(renderFileBlock(file, fold));
       }
     }
   });
@@ -70,19 +89,35 @@ export const formatStory = (files: DiffFile[], chapters: Chapter[]): string => {
 export const formatFilesJson = (files: DiffFile[]): string =>
   `${JSON.stringify({ files }, undefined, JSON_INDENT)}\n`;
 
+interface EnrichedFile {
+  additions: number;
+  binary: boolean;
+  deletions: number;
+  path: string;
+  noise?: NoiseKind;
+}
+
+const enrichFile = (file: DiffFile | undefined, path: string): EnrichedFile => {
+  const entry: EnrichedFile = {
+    additions: file?.additions ?? ZERO,
+    binary: file?.binary ?? false,
+    deletions: file?.deletions ?? ZERO,
+    path,
+  };
+  if (file !== undefined) {
+    const kind = classifyNoise(file);
+    if (kind !== undefined) {
+      entry.noise = kind;
+    }
+  }
+  return entry;
+};
+
 /** Serialize the resolved story as JSON (the `format --json` output). */
 export const formatJson = (chapters: Chapter[], files: DiffFile[]): string => {
   const byPath = new Map(files.map((file) => [file.path, file]));
   const enriched = chapters.map((chapter) => ({
-    files: chapter.files.map((path) => {
-      const file = byPath.get(path);
-      return {
-        additions: file?.additions ?? ZERO,
-        binary: file?.binary ?? false,
-        deletions: file?.deletions ?? ZERO,
-        path,
-      };
-    }),
+    files: chapter.files.map((path) => enrichFile(byPath.get(path), path)),
     synopsis: chapter.synopsis,
     title: chapter.title,
   }));

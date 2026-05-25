@@ -42,6 +42,8 @@ export {
 
 export { formatFilesJson, formatJson, formatStory } from "./formatter";
 
+export { classifyNoise, type NoiseKind } from "./noise";
+
 export { DiffStoryError, type ErrorInfo, Errors } from "./errors";
 
 export type { Chapter, DiffFile } from "./types";

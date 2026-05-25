@@ -8,6 +8,7 @@ export interface CliFlags {
   version: boolean;
   json: boolean;
   jsonSchema: boolean;
+  fold: boolean;
   chapters?: string;
   chaptersJson?: string;
   agent?: string;
@@ -22,6 +23,7 @@ const OPTIONS = {
   agent: { type: "string" },
   chapters: { type: "string" },
   "chapters-json": { type: "string" },
+  fold: { type: "boolean" },
   help: { short: "h", type: "boolean" },
   json: { type: "boolean" },
   "json-schema": { type: "boolean" },
@@ -56,6 +58,7 @@ export const parseCliArgs = (argv: string[]): ParsedCli => {
       agent: values.agent,
       chapters: values.chapters,
       chaptersJson: values["chapters-json"],
+      fold: values.fold === true,
       help: values.help === true,
       json: values.json === true,
       jsonSchema: values["json-schema"] === true,

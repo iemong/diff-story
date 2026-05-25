@@ -29,6 +29,8 @@ OPTIONS
   -h, --help               Show this help.
   -v, --version            Print the version.
       --json               (format/auto) Emit JSON instead of an annotated diff.
+      --fold               (format/auto) Collapse noise (lockfiles, generated,
+                           renames, binaries) to a one-line summary. Off by default.
       --json-schema        Print the chapters JSON schema and exit.
       --chapters JSON      (format) Chapters as an inline JSON string.
       --chapters-json PATH (format) Chapters from a JSON file.
