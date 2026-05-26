@@ -4,7 +4,7 @@ const ONE_BASED = 1;
 
 /** The chapters JSON shape the agent must produce, shown inline in the plan. */
 export const CHAPTERS_SHAPE =
-  '{"chapters":[{"title":"...","synopsis":"...","files":["path", ...]}]}';
+  '{"chapters":[{"title":"...","synopsis":"...","risk":"high|medium|low","checklist":["..."],"files":["path", ...]}]}';
 
 /** Render the changed files as a numbered manifest with their +/- counts. */
 export const buildManifest = (files: DiffFile[]): string =>
@@ -39,6 +39,8 @@ export const buildPlan = (files: DiffFile[]): string =>
     "",
     "Rules: use each file path below exactly once, copied verbatim; keep each",
     "synopsis to one or two sentences; order chapters as a reading sequence.",
+    'Optionally add per-chapter "risk" (high|medium|low) and a "checklist" of',
+    "review checks (short strings) to guide the reviewer.",
     "",
     `Files (${files.length}):`,
     buildManifest(files),

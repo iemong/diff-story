@@ -1,4 +1,4 @@
-import type { Chapter, DiffFile } from "../types";
+import type { Chapter, DiffFile, Risk } from "../types";
 import { type NoiseKind, classifyNoise } from "../noise";
 
 const BAR_WIDTH = 60;
@@ -40,13 +40,19 @@ export const renderBanner = (index: number, total: number, chapter: Chapter): st
     }
     return `#           ${line}`;
   });
-  return [
-    `# ${BAR}`,
-    `# 📖 Chapter ${index}/${total} — ${chapter.title}`,
-    "#",
-    ...synopsisLines,
-    `# ${BAR}`,
-  ].join("\n");
+  let header = `# 📖 Chapter ${index}/${total} — ${chapter.title}`;
+  if (chapter.risk !== undefined) {
+    header += `  [risk: ${chapter.risk}]`;
+  }
+  const lines = [`# ${BAR}`, header, "#", ...synopsisLines];
+  if (chapter.checklist !== undefined && chapter.checklist.length > ZERO) {
+    lines.push("#", "# Checklist:");
+    for (const item of chapter.checklist) {
+      lines.push(`#   □ ${item}`);
+    }
+  }
+  lines.push(`# ${BAR}`);
+  return lines.join("\n");
 };
 
 /** Collapse a noisy file to a single `#` summary line instead of its full diff. */
@@ -113,13 +119,32 @@ const enrichFile = (file: DiffFile | undefined, path: string): EnrichedFile => {
   return entry;
 };
 
-/** Serialize the resolved story as JSON (the `format --json` output). */
-export const formatJson = (chapters: Chapter[], files: DiffFile[]): string => {
-  const byPath = new Map(files.map((file) => [file.path, file]));
-  const enriched = chapters.map((chapter) => ({
+interface EnrichedChapter {
+  title: string;
+  synopsis: string;
+  files: EnrichedFile[];
+  risk?: Risk;
+  checklist?: string[];
+}
+
+const enrichChapter = (chapter: Chapter, byPath: Map<string, DiffFile>): EnrichedChapter => {
+  const entry: EnrichedChapter = {
     files: chapter.files.map((path) => enrichFile(byPath.get(path), path)),
     synopsis: chapter.synopsis,
     title: chapter.title,
-  }));
+  };
+  if (chapter.risk !== undefined) {
+    entry.risk = chapter.risk;
+  }
+  if (chapter.checklist !== undefined) {
+    entry.checklist = chapter.checklist;
+  }
+  return entry;
+};
+
+/** Serialize the resolved story as JSON (the `format --json` output). */
+export const formatJson = (chapters: Chapter[], files: DiffFile[]): string => {
+  const byPath = new Map(files.map((file) => [file.path, file]));
+  const enriched = chapters.map((chapter) => enrichChapter(chapter, byPath));
   return `${JSON.stringify({ chapters: enriched }, undefined, JSON_INDENT)}\n`;
 };

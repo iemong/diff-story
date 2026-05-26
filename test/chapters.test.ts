@@ -41,6 +41,12 @@ describe("CHAPTERS_SCHEMA", () => {
       "files",
     ]);
   });
+
+  test("documents optional risk and checklist properties", () => {
+    const { properties } = CHAPTERS_SCHEMA.properties.chapters.items;
+    expect(properties.risk.enum).toEqual(["high", "medium", "low"]);
+    expect(properties.checklist.type).toBe("array");
+  });
 });
 
 describe("validateChapterArray", () => {
@@ -77,6 +83,32 @@ describe("validateChapterArray", () => {
     expect(
       whyOf(() => validateChapterArray([{ files: "x", synopsis: "s", title: "t" }])),
     ).toContain('"files"');
+  });
+
+  test("accepts optional risk and checklist", () => {
+    expect(
+      validateChapterArray([
+        { checklist: ["check auth"], files: ["a"], risk: "high", synopsis: "S", title: "T" },
+      ]),
+    ).toEqual([
+      { checklist: ["check auth"], files: ["a"], risk: "high", synopsis: "S", title: "T" },
+    ]);
+  });
+
+  test("rejects an unknown risk value", () => {
+    expect(
+      whyOf(() =>
+        validateChapterArray([{ files: ["a"], risk: "critical", synopsis: "s", title: "t" }]),
+      ),
+    ).toContain('"risk"');
+  });
+
+  test("rejects a checklist that is not an array of strings", () => {
+    expect(
+      whyOf(() =>
+        validateChapterArray([{ checklist: [true], files: ["a"], synopsis: "s", title: "t" }]),
+      ),
+    ).toContain('"checklist"');
   });
 });
 

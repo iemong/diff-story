@@ -51,6 +51,8 @@ export const buildAutoPrompt = (files: DiffFile[], rawDiff: string): string =>
     "",
     "Rules: use each file path below exactly once, copied verbatim; keep each",
     "synopsis to one or two sentences; order chapters as a reading sequence.",
+    'Optionally add per-chapter "risk" (high|medium|low) and a "checklist" of',
+    "review checks (short strings) to guide the reviewer.",
     "",
     `Files (${files.length}):`,
     buildManifest(files),

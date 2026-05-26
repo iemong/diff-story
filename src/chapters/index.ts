@@ -1,7 +1,9 @@
-import type { Chapter, DiffFile } from "../types";
+import type { Chapter, DiffFile, Risk } from "../types";
 import { Errors } from "../errors";
 
 const NO_FILES = 0;
+
+const RISKS = new Set<string>(["high", "medium", "low"]);
 
 /** JSON Schema for the chapters an agent must produce and hand back to `format`. */
 export const CHAPTERS_SCHEMA = {
@@ -10,7 +12,9 @@ export const CHAPTERS_SCHEMA = {
     chapters: {
       items: {
         properties: {
+          checklist: { items: { type: "string" }, type: "array" },
           files: { items: { type: "string" }, type: "array" },
+          risk: { enum: ["high", "medium", "low"], type: "string" },
           synopsis: { type: "string" },
           title: { type: "string" },
         },
@@ -28,27 +32,55 @@ export const CHAPTERS_SCHEMA = {
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === "object" && value !== null && !Array.isArray(value);
 
+const isStringArray = (value: unknown): value is string[] =>
+  Array.isArray(value) && value.every((item) => typeof item === "string");
+
+const validateRisk = (value: unknown, index: number): Risk | undefined => {
+  if (value !== undefined && (typeof value !== "string" || !RISKS.has(value))) {
+    throw Errors.invalidChaptersJson(`chapter ${index}: "risk" must be high, medium, or low`);
+  }
+  return value as Risk | undefined;
+};
+
+const validateChecklist = (value: unknown, index: number): string[] | undefined => {
+  if (value !== undefined && !isStringArray(value)) {
+    throw Errors.invalidChaptersJson(`chapter ${index}: "checklist" must be an array of strings`);
+  }
+  return value as string[] | undefined;
+};
+
+const validateChapter = (entry: unknown, index: number): Chapter => {
+  if (!isRecord(entry)) {
+    throw Errors.invalidChaptersJson(`chapter ${index} is not an object`);
+  }
+  const { title, synopsis, files, risk, checklist } = entry;
+  if (typeof title !== "string") {
+    throw Errors.invalidChaptersJson(`chapter ${index}: "title" must be a string`);
+  }
+  if (typeof synopsis !== "string") {
+    throw Errors.invalidChaptersJson(`chapter ${index}: "synopsis" must be a string`);
+  }
+  if (!isStringArray(files)) {
+    throw Errors.invalidChaptersJson(`chapter ${index}: "files" must be an array of strings`);
+  }
+  const chapter: Chapter = { files, synopsis, title };
+  const validRisk = validateRisk(risk, index);
+  if (validRisk !== undefined) {
+    chapter.risk = validRisk;
+  }
+  const validChecklist = validateChecklist(checklist, index);
+  if (validChecklist !== undefined) {
+    chapter.checklist = validChecklist;
+  }
+  return chapter;
+};
+
 /** Validate that an unknown value is a well-formed array of chapters. */
 export const validateChapterArray = (value: unknown): Chapter[] => {
   if (!Array.isArray(value)) {
     throw Errors.invalidChaptersJson("expected an array of chapters");
   }
-  return value.map((entry, index) => {
-    if (!isRecord(entry)) {
-      throw Errors.invalidChaptersJson(`chapter ${index} is not an object`);
-    }
-    const { title, synopsis, files } = entry;
-    if (typeof title !== "string") {
-      throw Errors.invalidChaptersJson(`chapter ${index}: "title" must be a string`);
-    }
-    if (typeof synopsis !== "string") {
-      throw Errors.invalidChaptersJson(`chapter ${index}: "synopsis" must be a string`);
-    }
-    if (!Array.isArray(files) || files.some((file) => typeof file !== "string")) {
-      throw Errors.invalidChaptersJson(`chapter ${index}: "files" must be an array of strings`);
-    }
-    return { files: files as string[], synopsis, title };
-  });
+  return value.map((entry, index) => validateChapter(entry, index));
 };
 
 const parseJson = (text: string): unknown => {
@@ -99,6 +131,7 @@ export const appendLeftovers = (chapters: Chapter[], files: DiffFile[]): Chapter
     ...chapters,
     {
       files: leftovers,
+      risk: "low",
       synopsis: "Files not assigned to a chapter.",
       title: "Appendix — unsorted changes",
     },

@@ -46,6 +46,6 @@ export { classifyNoise, type NoiseKind } from "./noise";
 
 export { DiffStoryError, type ErrorInfo, Errors } from "./errors";
 
-export type { Chapter, DiffFile } from "./types";
+export type { Chapter, DiffFile, Risk } from "./types";
 
 export { VERSION } from "./version";

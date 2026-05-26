@@ -16,6 +16,9 @@ export interface DiffFile {
   rawText: string;
 }
 
+/** How much reviewer attention a chapter likely needs. */
+export type Risk = "high" | "medium" | "low";
+
 /** A chapter groups related files into one beat of the change's story. */
 export interface Chapter {
   /** Chapter title, e.g. "API contract changes". */
@@ -24,6 +27,10 @@ export interface Chapter {
   synopsis: string;
   /** Display paths of the files in this chapter, in reading order. */
   files: string[];
+  /** Optional reviewer-attention level the agent assigns; drives `--order risk`. */
+  risk?: Risk;
+  /** Optional per-chapter review checks ("what to verify"). */
+  checklist?: string[];
 }
 
 /** The outcome of running an external agent CLI: its captured streams + exit code. */

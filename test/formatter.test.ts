@@ -53,6 +53,36 @@ describe("renderBanner", () => {
     expect(banner.split("\n")[FIRST].startsWith("# ═")).toBe(true);
   });
 
+  test("shows a risk badge and a checklist when present", () => {
+    const banner = renderBanner(ONE, ONE, {
+      checklist: ["verify the boundary", "add a test"],
+      files: [],
+      risk: "high",
+      synopsis: "S",
+      title: "Risky",
+    });
+    expect(banner).toContain("— Risky  [risk: high]");
+    expect(banner).toContain("# Checklist:");
+    expect(banner).toContain("#   □ verify the boundary");
+    expect(banner).toContain("#   □ add a test");
+  });
+
+  test("omits the risk badge and checklist when absent", () => {
+    const banner = renderBanner(ONE, ONE, { files: [], synopsis: "S", title: "Plain" });
+    expect(banner).not.toContain("[risk:");
+    expect(banner).not.toContain("Checklist:");
+  });
+
+  test("omits an empty checklist", () => {
+    const banner = renderBanner(ONE, ONE, {
+      checklist: [],
+      files: [],
+      synopsis: "S",
+      title: "Plain",
+    });
+    expect(banner).not.toContain("Checklist:");
+  });
+
   test("indents wrapped synopsis continuation lines", () => {
     const longSynopsis = Array.from(
       { length: WORD_COUNT },
@@ -162,5 +192,20 @@ describe("formatJson", () => {
   test("omits the noise key for signal files", () => {
     const json = JSON.parse(formatJson(chapters, [file("a.ts")]));
     expect(json.chapters[FIRST].files[FIRST]).not.toHaveProperty("noise");
+  });
+
+  test("carries chapter risk and checklist when present", () => {
+    const withMeta: Chapter[] = [
+      { checklist: ["c1"], files: ["a.ts"], risk: "medium", synopsis: "S", title: "T" },
+    ];
+    const json = JSON.parse(formatJson(withMeta, [file("a.ts")]));
+    expect(json.chapters[FIRST].risk).toBe("medium");
+    expect(json.chapters[FIRST].checklist).toEqual(["c1"]);
+  });
+
+  test("omits risk and checklist when absent", () => {
+    const json = JSON.parse(formatJson(chapters, [file("a.ts")]));
+    expect(json.chapters[FIRST]).not.toHaveProperty("risk");
+    expect(json.chapters[FIRST]).not.toHaveProperty("checklist");
   });
 });
