@@ -14,8 +14,12 @@ PROTOCOL (for the calling agent)
   2. (you decide the chapters as JSON)
   3. git diff | diff-story format --chapters '<json>'   → the annotated story
 
+  Or run it all in one command with your own agent CLI:
+    git diff | diff-story auto
+
 COMMANDS
   (default) / plan   Print the plan: the file manifest and the chapters to produce.
+  auto               Drive the whole protocol via your installed agent CLI in one step.
   format             Re-emit the diff grouped under the chapters you supply.
   parse              Parse the diff and print files as JSON.
   doctor             Check the environment (git, parse-diff, runtime).
@@ -24,13 +28,21 @@ COMMANDS
 OPTIONS
   -h, --help               Show this help.
   -v, --version            Print the version.
-      --json               (format) Emit JSON instead of an annotated diff.
+      --json               (format/auto) Emit JSON instead of an annotated diff.
+      --fold               (format/auto) Collapse noise (lockfiles, generated,
+                           renames, binaries) to a one-line summary. Off by default.
+      --order ORDER        (format/auto) Chapter order: "narrative" (default) or
+                           "risk" (riskiest chapters first).
       --json-schema        Print the chapters JSON schema and exit.
       --chapters JSON      (format) Chapters as an inline JSON string.
       --chapters-json PATH (format) Chapters from a JSON file.
+      --agent COMMAND      (auto) Agent CLI to drive, e.g. --agent 'claude -p'.
+                           Defaults to the first of claude, codex found on PATH.
 
 EXAMPLES
   git diff main..feature | diff-story
+  git diff | diff-story auto
+  git diff | diff-story auto --agent 'claude -p'
   git diff | diff-story format --chapters '{"chapters":[{"title":"Setup","synopsis":"…","files":["src/a.ts"]}]}'
   git diff | diff-story format --chapters-json chapters.json --json
   git diff | diff-story parse

@@ -1,6 +1,6 @@
 import { DiffStoryError, Errors } from "./errors";
 import { renderDoctor, runDoctorChecks } from "./cli/doctor";
-import { runFormat, runParse, runPlan } from "./cli/commands";
+import { runAuto, runFormat, runParse, runPlan } from "./cli/commands";
 import { CHAPTERS_SCHEMA } from "./chapters";
 import { HELP } from "./cli/help";
 import type { Io } from "./types";
@@ -52,6 +52,9 @@ export const main = async (argv: string[], io: Io): Promise<number> => {
       }
       case "format": {
         return await runFormat(flags, io);
+      }
+      case "auto": {
+        return await runAuto(flags, io);
       }
       case "doctor": {
         const { checks, code } = await runDoctorChecks(io);

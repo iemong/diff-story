@@ -12,9 +12,11 @@ describe("parseCliArgs", () => {
     expect(parsed.flags).toEqual({
       chapters: undefined,
       chaptersJson: undefined,
+      fold: false,
       help: false,
       json: false,
       jsonSchema: false,
+      order: "narrative",
       version: false,
     });
   });
@@ -37,9 +39,11 @@ describe("parseCliArgs", () => {
     expect(parsed.flags).toEqual({
       chapters: '{"chapters":[]}',
       chaptersJson: "ch.json",
+      fold: false,
       help: false,
       json: true,
       jsonSchema: true,
+      order: "narrative",
       version: false,
     });
   });
@@ -47,6 +51,18 @@ describe("parseCliArgs", () => {
   test("supports -h and -v short flags", () => {
     expect(parseCliArgs(["-h"]).flags.help).toBe(true);
     expect(parseCliArgs(["-v"]).flags.version).toBe(true);
+  });
+
+  test("accepts --order risk", () => {
+    expect(parseCliArgs(["auto", "--order", "risk"]).flags.order).toBe("risk");
+  });
+
+  test("accepts --order narrative explicitly", () => {
+    expect(parseCliArgs(["auto", "--order", "narrative"]).flags.order).toBe("narrative");
+  });
+
+  test("throws DS_E007 on an unknown --order value", () => {
+    expect(() => parseCliArgs(["auto", "--order", "wat"])).toThrow("DS_E007");
   });
 
   test("throws DS_E007 on an unknown flag", () => {

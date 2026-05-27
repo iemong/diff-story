@@ -54,7 +54,8 @@ src/
 ├── formatter/   DiffFile[] + Chapter[] → string / JSON
 ├── cli/         arg parsing, command routing, doctor, help
 ├── errors/      DiffStoryError + the What/Why/How catalog
-├── io.ts        the one impure module (stdin/stdout/fs) — DI'd everywhere
+├── agent/       agent CLI registry + prompt/JSON helpers for the `auto` command
+├── io.ts        the one impure module (stdin/stdout/fs + subprocess) — DI'd everywhere
 ├── main.ts      main(argv, io) — pure, returns an exit code
 ├── mod.ts       the portable public library surface (JSR export)
 └── types.ts     shared domain + Io interface
@@ -62,8 +63,12 @@ src/
 
 The whole program is `main(argv: string[], io: Io): Promise<number>`. Every
 side effect is on `io`, injected by the caller. `bin/diff-story.ts` is the only
-place that wires the real `io` and calls `process.exit`. There is no model
-client anywhere — `io` is just stdin/stdout/fs.
+place that wires the real `io` and calls `process.exit`. `io` is just
+stdin/stdout/fs **plus a generic subprocess runner** (`runAgent`). There is
+still no model client anywhere: `runAgent` spawns whatever command it is given,
+and the `auto` command points it at the **user's own** agent CLI (e.g.
+`claude -p`). The tool embeds no model, key, or network of its own — the
+spawned agent is the intelligence, kept outside the tool as ever.
 
 ## Non-negotiable quality bars
 

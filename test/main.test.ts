@@ -121,6 +121,45 @@ describe("main — format", () => {
     expect(io.out).toContain("Appendix");
     expect(io.out).toContain("src/b.ts");
   });
+
+  test("anchors agent notes inline and drops hallucinated ones", async () => {
+    const io = makeIo({ stdin: SIMPLE_DIFF });
+    const review =
+      '{"chapters":[{"title":"T","synopsis":"s","files":["src/a.ts"]}],' +
+      '"notes":[{"file":"src/a.ts","line":1,"kind":"issue","body":"real anchor"},' +
+      '{"file":"ghost.ts","line":1,"kind":"nit","body":"hallucinated"}]}';
+    await main(["format", "--chapters", review], io);
+    expect(io.out).toContain("# 💬 [issue] real anchor");
+    expect(io.out).not.toContain("hallucinated");
+  });
+
+  test("--order risk reads the riskiest chapter first", async () => {
+    const io = makeIo({ stdin: TWO_FILE_DIFF });
+    const chapters =
+      '[{"title":"Safe","synopsis":"s","files":["src/a.ts"],"risk":"low"},' +
+      '{"title":"Risky","synopsis":"s","files":["src/b.ts"],"risk":"high"}]';
+    await main(["format", "--order", "risk", "--chapters", chapters], io);
+    expect(io.out.indexOf("Risky")).toBeLessThan(io.out.indexOf("Safe"));
+  });
+
+  test("--fold collapses noise files behind a one-line summary", async () => {
+    const lockDiff = [
+      "diff --git a/yarn.lock b/yarn.lock",
+      "--- a/yarn.lock",
+      "+++ b/yarn.lock",
+      "@@ -1 +1 @@",
+      "-old",
+      "+new",
+      "",
+    ].join("\n");
+    const io = makeIo({ stdin: lockDiff });
+    await main(
+      ["format", "--fold", "--chapters", '[{"title":"Deps","synopsis":"s","files":["yarn.lock"]}]'],
+      io,
+    );
+    expect(io.out).toContain("(lockfile)");
+    expect(io.out).not.toContain("+new");
+  });
 });
 
 describe("main — doctor", () => {

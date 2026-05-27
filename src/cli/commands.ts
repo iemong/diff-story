@@ -1,12 +1,15 @@
-import type { Chapter, DiffFile, Io } from "../types";
+import type { Chapter, DiffFile, Io, Note, Review } from "../types";
+import { buildAutoPrompt, detectAgent, extractJsonText } from "../agent";
 import { formatFilesJson, formatJson, formatStory } from "../formatter";
-import { parseChaptersJson, reconcileChapters } from "../chapters";
+import { parseReview, reconcileReview } from "../chapters";
 import type { CliFlags } from "./args";
 import { Errors } from "../errors";
 import { buildPlan } from "../plan";
+import { orderByRisk } from "../risk";
 import { parseUnifiedDiff } from "../parser";
 
 const OK = 0;
+const WARN_PROMPT_BYTES = 100_000;
 
 const readFiles = async (io: Io): Promise<DiffFile[]> => parseUnifiedDiff(await io.readStdin());
 
@@ -28,9 +31,9 @@ const readChaptersText = async (flags: CliFlags, io: Io): Promise<string> => {
   }
 };
 
-const resolveChapters = async (flags: CliFlags, io: Io, files: DiffFile[]): Promise<Chapter[]> => {
+const resolveReview = async (flags: CliFlags, io: Io, files: DiffFile[]): Promise<Review> => {
   const text = await readChaptersText(flags, io);
-  return reconcileChapters(parseChaptersJson(text), files);
+  return reconcileReview(parseReview(text), files);
 };
 
 /** Default command: emit the request the agent fulfils (the file plan). */
@@ -45,14 +48,52 @@ export const runParse = async (io: Io): Promise<number> => {
   return OK;
 };
 
+const renderStory = (
+  flags: CliFlags,
+  files: DiffFile[],
+  chapters: Chapter[],
+  notes: Note[],
+): string => {
+  let ordered = chapters;
+  if (flags.order === "risk") {
+    ordered = orderByRisk(chapters, files);
+  }
+  if (flags.json) {
+    return formatJson(ordered, files, notes);
+  }
+  return formatStory(files, ordered, { fold: flags.fold, notes });
+};
+
 /** Re-emit the diff grouped under the chapters the agent supplies. */
 export const runFormat = async (flags: CliFlags, io: Io): Promise<number> => {
   const files = await readFiles(io);
-  const chapters = await resolveChapters(flags, io, files);
-  let output = formatStory(files, chapters);
-  if (flags.json) {
-    output = formatJson(chapters, files);
+  const review = await resolveReview(flags, io, files);
+  io.write(renderStory(flags, files, review.chapters, review.notes));
+  return OK;
+};
+
+/**
+ * `auto`: drive the whole protocol in one command. Detect the user's agent CLI,
+ * hand it the diff, and render the chapters it returns. diff-story stays a
+ * deterministic filter — the spawned agent is the intelligence.
+ */
+export const runAuto = async (flags: CliFlags, io: Io): Promise<number> => {
+  const raw = await io.readStdin();
+  const files = parseUnifiedDiff(raw);
+  const agent = await detectAgent(io, flags.agent);
+  const prompt = buildAutoPrompt(files, raw);
+  io.writeError(`diff-story: running ${agent.command}… (this can take a while)\n`);
+  if (prompt.length > WARN_PROMPT_BYTES) {
+    io.writeError(`diff-story: large prompt (${prompt.length} bytes); the agent may truncate it\n`);
   }
-  io.write(output);
+  const result = await io.runAgent(agent.command, agent.args, prompt);
+  if (result.exitCode !== OK) {
+    throw Errors.agentFailed(
+      agent.command,
+      result.stderr.trim() || `exited with code ${result.exitCode}`,
+    );
+  }
+  const review = reconcileReview(parseReview(extractJsonText(result.stdout)), files);
+  io.write(renderStory(flags, files, review.chapters, review.notes));
   return OK;
 };

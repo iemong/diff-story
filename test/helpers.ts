@@ -1,4 +1,4 @@
-import type { Io } from "../src/types";
+import type { AgentResult, Io } from "../src/types";
 
 export const EXIT_OK = 0;
 export const EXIT_FAIL = 1;
@@ -10,6 +10,7 @@ export interface FakeIoOptions {
   files?: Record<string, string>;
   bunVersion?: string;
   which?: (command: string) => Promise<string | undefined>;
+  runAgent?: (command: string, args: string[], input: string) => Promise<AgentResult>;
 }
 
 export interface FakeIo extends Io {
@@ -37,6 +38,9 @@ export const makeIo = (options: FakeIoOptions = {}): FakeIo => {
       return Promise.resolve(files[path]);
     },
     readStdin: toReadStdin(options.stdin ?? ""),
+    runAgent:
+      options.runAgent ??
+      ((): Promise<AgentResult> => Promise.resolve({ exitCode: 0, stderr: "", stdout: "" })),
     which: options.which ?? ((): Promise<string | undefined> => Promise.resolve("/usr/bin/git")),
     write: (text: string) => {
       io.out += text;

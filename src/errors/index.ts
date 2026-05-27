@@ -40,6 +40,22 @@ export class DiffStoryError extends Error {
 
 /** The catalog of every error diff-story can raise. */
 export const Errors = {
+  agentFailed: (command: string, detail: string): DiffStoryError =>
+    new DiffStoryError({
+      code: "DS_E021",
+      how: "Check the agent runs on its own, pass another with --agent, or drive the manual `plan` → `format` protocol",
+      what: `The agent "${command}" failed to produce chapters`,
+      why: detail,
+    }),
+
+  agentNotFound: (tried: string): DiffStoryError =>
+    new DiffStoryError({
+      code: "DS_E020",
+      how: "Install one of them, pass your own with --agent '<command>', or drive the manual `plan` → `format` protocol yourself",
+      what: "No coding-agent CLI was found to drive `auto`",
+      why: `none of the known agents are on PATH (tried: ${tried})`,
+    }),
+
   badArguments: (detail: string): DiffStoryError =>
     new DiffStoryError({
       code: "DS_E007",
@@ -99,7 +115,7 @@ export const Errors = {
   unknownCommand: (command: string): DiffStoryError =>
     new DiffStoryError({
       code: "DS_E008",
-      how: "Use one of: plan, parse, format, doctor, help — or run `diff-story --help`",
+      how: "Use one of: plan, auto, parse, format, doctor, help — or run `diff-story --help`",
       what: `Unknown command "${command}"`,
       why: "That is not one of the diff-story subcommands",
     }),
