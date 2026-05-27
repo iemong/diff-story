@@ -19,6 +19,21 @@ export interface DiffFile {
 /** How much reviewer attention a chapter likely needs. */
 export type Risk = "high" | "medium" | "low";
 
+/** The flavor of an inline review note. */
+export type NoteKind = "issue" | "question" | "nit" | "praise";
+
+/** An inline review comment the agent anchors to a file and line. */
+export interface Note {
+  /** Display path of the file the note targets. */
+  file: string;
+  /** Line number in the new (post-image) file the note attaches to. */
+  line: number;
+  /** What kind of comment this is. */
+  kind: NoteKind;
+  /** The comment text. */
+  body: string;
+}
+
 /** A chapter groups related files into one beat of the change's story. */
 export interface Chapter {
   /** Chapter title, e.g. "API contract changes". */
@@ -31,6 +46,12 @@ export interface Chapter {
   risk?: Risk;
   /** Optional per-chapter review checks ("what to verify"). */
   checklist?: string[];
+}
+
+/** The agent's full review payload: chapters plus optional inline notes. */
+export interface Review {
+  chapters: Chapter[];
+  notes: Note[];
 }
 
 /** The outcome of running an external agent CLI: its captured streams + exit code. */

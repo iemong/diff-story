@@ -2,8 +2,10 @@ import {
   CHAPTERS_SCHEMA,
   appendLeftovers,
   parseChaptersJson,
+  parseReview,
   pruneUnknownFiles,
   reconcileChapters,
+  reconcileReview,
   validateChapterArray,
 } from "../src/chapters";
 import { FIRST, SECOND } from "./helpers";
@@ -131,6 +133,71 @@ describe("parseChaptersJson", () => {
   });
   test("throws DS_E011 for a non-array, non-object JSON value", () => {
     expect(() => parseChaptersJson("42")).toThrow("DS_E011");
+  });
+});
+
+describe("parseReview", () => {
+  const REVIEW =
+    '{"chapters":[{"title":"T","synopsis":"S","files":["a"]}],' +
+    '"notes":[{"file":"a","line":3,"kind":"issue","body":"hmm"}]}';
+
+  test("parses chapters and notes from a review object", () => {
+    const review = parseReview(REVIEW);
+    expect(review.chapters).toEqual([{ files: ["a"], synopsis: "S", title: "T" }]);
+    expect(review.notes).toEqual([{ body: "hmm", file: "a", kind: "issue", line: 3 }]);
+  });
+
+  test("a bare chapters array yields no notes", () => {
+    expect(parseReview('[{"title":"T","synopsis":"S","files":["a"]}]').notes).toEqual([]);
+  });
+
+  test("rejects a non-array notes field", () => {
+    expect(whyOf(() => parseReview('{"chapters":[],"notes":{}}'))).toContain('"notes"');
+  });
+
+  test("rejects a non-object note", () => {
+    expect(whyOf(() => parseReview('{"chapters":[],"notes":["x"]}'))).toContain(
+      "note 0 is not an object",
+    );
+  });
+
+  test("rejects notes with a bad file, line, kind, or body", () => {
+    expect(
+      whyOf(() => parseReview('{"chapters":[],"notes":[{"line":1,"kind":"issue","body":"b"}]}')),
+    ).toContain('"file"');
+    expect(
+      whyOf(() =>
+        parseReview('{"chapters":[],"notes":[{"file":"a","line":1.5,"kind":"issue","body":"b"}]}'),
+      ),
+    ).toContain('"line"');
+    expect(
+      whyOf(() =>
+        parseReview('{"chapters":[],"notes":[{"file":"a","line":1,"kind":"rant","body":"b"}]}'),
+      ),
+    ).toContain('"kind"');
+    expect(
+      whyOf(() => parseReview('{"chapters":[],"notes":[{"file":"a","line":1,"kind":"issue"}]}')),
+    ).toContain('"body"');
+  });
+});
+
+describe("reconcileReview", () => {
+  const RAW = ["diff --git a/a b/a", "--- a/a", "+++ b/a", "@@ -0,0 +1 @@", "+added"].join("\n");
+
+  test("reconciles chapters and drops notes that do not anchor", () => {
+    const files: DiffFile[] = [{ ...file("a"), rawText: RAW }];
+    const review = reconcileReview(
+      {
+        chapters: [{ files: ["a"], synopsis: "s", title: "c" }],
+        notes: [
+          { body: "kept", file: "a", kind: "issue", line: 1 },
+          { body: "dropped", file: "ghost", kind: "nit", line: 1 },
+        ],
+      },
+      files,
+    );
+    expect(review.chapters[FIRST].files).toEqual(["a"]);
+    expect(review.notes).toEqual([{ body: "kept", file: "a", kind: "issue", line: 1 }]);
   });
 });
 

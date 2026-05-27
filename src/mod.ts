@@ -35,19 +35,23 @@ export {
   appendLeftovers,
   CHAPTERS_SCHEMA,
   parseChaptersJson,
+  parseReview,
   pruneUnknownFiles,
   reconcileChapters,
+  reconcileReview,
   validateChapterArray,
 } from "./chapters";
 
-export { formatFilesJson, formatJson, formatStory } from "./formatter";
+export { type StoryOptions, formatFilesJson, formatJson, formatStory } from "./formatter";
 
 export { classifyNoise, type NoiseKind } from "./noise";
+
+export { anchorNotes, anchorableLines, renderWithNotes } from "./notes";
 
 export { effectiveRisk, orderByRisk } from "./risk";
 
 export { DiffStoryError, type ErrorInfo, Errors } from "./errors";
 
-export type { Chapter, DiffFile, Risk } from "./types";
+export type { Chapter, DiffFile, Note, NoteKind, Review, Risk } from "./types";
 
 export { VERSION } from "./version";

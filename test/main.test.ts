@@ -122,6 +122,17 @@ describe("main — format", () => {
     expect(io.out).toContain("src/b.ts");
   });
 
+  test("anchors agent notes inline and drops hallucinated ones", async () => {
+    const io = makeIo({ stdin: SIMPLE_DIFF });
+    const review =
+      '{"chapters":[{"title":"T","synopsis":"s","files":["src/a.ts"]}],' +
+      '"notes":[{"file":"src/a.ts","line":1,"kind":"issue","body":"real anchor"},' +
+      '{"file":"ghost.ts","line":1,"kind":"nit","body":"hallucinated"}]}';
+    await main(["format", "--chapters", review], io);
+    expect(io.out).toContain("# 💬 [issue] real anchor");
+    expect(io.out).not.toContain("hallucinated");
+  });
+
   test("--order risk reads the riskiest chapter first", async () => {
     const io = makeIo({ stdin: TWO_FILE_DIFF });
     const chapters =

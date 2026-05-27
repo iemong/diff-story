@@ -1,7 +1,7 @@
-import type { Chapter, DiffFile, Io } from "../types";
+import type { Chapter, DiffFile, Io, Note, Review } from "../types";
 import { buildAutoPrompt, detectAgent, extractJsonText } from "../agent";
 import { formatFilesJson, formatJson, formatStory } from "../formatter";
-import { parseChaptersJson, reconcileChapters } from "../chapters";
+import { parseReview, reconcileReview } from "../chapters";
 import type { CliFlags } from "./args";
 import { Errors } from "../errors";
 import { buildPlan } from "../plan";
@@ -31,9 +31,9 @@ const readChaptersText = async (flags: CliFlags, io: Io): Promise<string> => {
   }
 };
 
-const resolveChapters = async (flags: CliFlags, io: Io, files: DiffFile[]): Promise<Chapter[]> => {
+const resolveReview = async (flags: CliFlags, io: Io, files: DiffFile[]): Promise<Review> => {
   const text = await readChaptersText(flags, io);
-  return reconcileChapters(parseChaptersJson(text), files);
+  return reconcileReview(parseReview(text), files);
 };
 
 /** Default command: emit the request the agent fulfils (the file plan). */
@@ -48,22 +48,27 @@ export const runParse = async (io: Io): Promise<number> => {
   return OK;
 };
 
-const renderStory = (flags: CliFlags, files: DiffFile[], chapters: Chapter[]): string => {
+const renderStory = (
+  flags: CliFlags,
+  files: DiffFile[],
+  chapters: Chapter[],
+  notes: Note[],
+): string => {
   let ordered = chapters;
   if (flags.order === "risk") {
     ordered = orderByRisk(chapters, files);
   }
   if (flags.json) {
-    return formatJson(ordered, files);
+    return formatJson(ordered, files, notes);
   }
-  return formatStory(files, ordered, flags.fold);
+  return formatStory(files, ordered, { fold: flags.fold, notes });
 };
 
 /** Re-emit the diff grouped under the chapters the agent supplies. */
 export const runFormat = async (flags: CliFlags, io: Io): Promise<number> => {
   const files = await readFiles(io);
-  const chapters = await resolveChapters(flags, io, files);
-  io.write(renderStory(flags, files, chapters));
+  const review = await resolveReview(flags, io, files);
+  io.write(renderStory(flags, files, review.chapters, review.notes));
   return OK;
 };
 
@@ -88,7 +93,7 @@ export const runAuto = async (flags: CliFlags, io: Io): Promise<number> => {
       result.stderr.trim() || `exited with code ${result.exitCode}`,
     );
   }
-  const chapters = reconcileChapters(parseChaptersJson(extractJsonText(result.stdout)), files);
-  io.write(renderStory(flags, files, chapters));
+  const review = reconcileReview(parseReview(extractJsonText(result.stdout)), files);
+  io.write(renderStory(flags, files, review.chapters, review.notes));
   return OK;
 };

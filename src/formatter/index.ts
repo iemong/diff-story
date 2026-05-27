@@ -1,5 +1,6 @@
-import type { Chapter, DiffFile, Risk } from "../types";
+import type { Chapter, DiffFile, Note, Risk } from "../types";
 import { type NoiseKind, classifyNoise } from "../noise";
+import { renderWithNotes } from "../notes";
 
 const BAR_WIDTH = 60;
 const SYNOPSIS_WIDTH = 72;
@@ -59,22 +60,48 @@ export const renderBanner = (index: number, total: number, chapter: Chapter): st
 const renderFoldedFile = (file: DiffFile, kind: NoiseKind): string =>
   `# ── ${file.path} (${kind}) +${file.additions} -${file.deletions} · folded; omit --fold for the full diff`;
 
-const renderFileBlock = (file: DiffFile, fold: boolean): string => {
+const renderFileBlock = (file: DiffFile, fold: boolean, notes: Note[]): string => {
   if (fold) {
     const kind = classifyNoise(file);
     if (kind !== undefined) {
       return renderFoldedFile(file, kind);
     }
   }
-  return file.rawText.replace(/\s+$/u, "");
+  return renderWithNotes(file.rawText, notes);
 };
 
+const groupNotesByPath = (notes: Note[]): Map<string, Note[]> => {
+  const byPath = new Map<string, Note[]>();
+  for (const note of notes) {
+    const list = byPath.get(note.file);
+    if (list === undefined) {
+      byPath.set(note.file, [note]);
+    } else {
+      list.push(note);
+    }
+  }
+  return byPath;
+};
+
+/** Options for rendering a story: fold low-signal files, attach inline notes. */
+export interface StoryOptions {
+  fold?: boolean;
+  notes?: Note[];
+}
+
 /**
- * Re-emit the diff grouped into chapters, each preceded by a banner. When
- * `fold` is set, low-signal files (lockfiles, generated output, renames,
- * binaries) collapse to a one-line summary; omit it to keep every diff verbatim.
+ * Re-emit the diff grouped into chapters, each preceded by a banner. With
+ * `fold`, low-signal files (lockfiles, generated output, renames, binaries)
+ * collapse to a one-line summary; without it every diff stays verbatim. Inline
+ * `notes` are inserted right after the line they anchor to.
  */
-export const formatStory = (files: DiffFile[], chapters: Chapter[], fold = false): string => {
+export const formatStory = (
+  files: DiffFile[],
+  chapters: Chapter[],
+  options: StoryOptions = {},
+): string => {
+  const fold = options.fold ?? false;
+  const notesByPath = groupNotesByPath(options.notes ?? []);
   const byPath = new Map(files.map((file) => [file.path, file]));
   const blocks: string[] = [];
 
@@ -83,7 +110,7 @@ export const formatStory = (files: DiffFile[], chapters: Chapter[], fold = false
     for (const path of chapter.files) {
       const file = byPath.get(path);
       if (file !== undefined) {
-        blocks.push(renderFileBlock(file, fold));
+        blocks.push(renderFileBlock(file, fold, notesByPath.get(path) ?? []));
       }
     }
   });
@@ -142,9 +169,17 @@ const enrichChapter = (chapter: Chapter, byPath: Map<string, DiffFile>): Enriche
   return entry;
 };
 
+interface Story {
+  chapters: EnrichedChapter[];
+  notes?: Note[];
+}
+
 /** Serialize the resolved story as JSON (the `format --json` output). */
-export const formatJson = (chapters: Chapter[], files: DiffFile[]): string => {
+export const formatJson = (chapters: Chapter[], files: DiffFile[], notes: Note[] = []): string => {
   const byPath = new Map(files.map((file) => [file.path, file]));
-  const enriched = chapters.map((chapter) => enrichChapter(chapter, byPath));
-  return `${JSON.stringify({ chapters: enriched }, undefined, JSON_INDENT)}\n`;
+  const story: Story = { chapters: chapters.map((chapter) => enrichChapter(chapter, byPath)) };
+  if (notes.length > ZERO) {
+    story.notes = notes;
+  }
+  return `${JSON.stringify(story, undefined, JSON_INDENT)}\n`;
 };

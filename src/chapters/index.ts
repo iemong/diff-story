@@ -1,9 +1,11 @@
-import type { Chapter, DiffFile, Risk } from "../types";
+import type { Chapter, DiffFile, Note, NoteKind, Review, Risk } from "../types";
 import { Errors } from "../errors";
+import { anchorNotes } from "../notes";
 
 const NO_FILES = 0;
 
 const RISKS = new Set<string>(["high", "medium", "low"]);
+const NOTE_KINDS = new Set<string>(["issue", "question", "nit", "praise"]);
 
 /** JSON Schema for the chapters an agent must produce and hand back to `format`. */
 export const CHAPTERS_SCHEMA = {
@@ -19,6 +21,19 @@ export const CHAPTERS_SCHEMA = {
           title: { type: "string" },
         },
         required: ["title", "synopsis", "files"],
+        type: "object",
+      },
+      type: "array",
+    },
+    notes: {
+      items: {
+        properties: {
+          body: { type: "string" },
+          file: { type: "string" },
+          kind: { enum: ["issue", "question", "nit", "praise"], type: "string" },
+          line: { type: "integer" },
+        },
+        required: ["file", "line", "kind", "body"],
         type: "object",
       },
       type: "array",
@@ -109,6 +124,44 @@ const extractChapters = (value: unknown): unknown => {
 export const parseChaptersJson = (text: string): Chapter[] =>
   validateChapterArray(extractChapters(parseJson(text)));
 
+const validateNote = (entry: unknown, index: number): Note => {
+  if (!isRecord(entry)) {
+    throw Errors.invalidChaptersJson(`note ${index} is not an object`);
+  }
+  const { file, line, kind, body } = entry;
+  if (typeof file !== "string") {
+    throw Errors.invalidChaptersJson(`note ${index}: "file" must be a string`);
+  }
+  if (typeof line !== "number" || !Number.isInteger(line)) {
+    throw Errors.invalidChaptersJson(`note ${index}: "line" must be an integer`);
+  }
+  if (typeof kind !== "string" || !NOTE_KINDS.has(kind)) {
+    throw Errors.invalidChaptersJson(
+      `note ${index}: "kind" must be issue, question, nit, or praise`,
+    );
+  }
+  if (typeof body !== "string") {
+    throw Errors.invalidChaptersJson(`note ${index}: "body" must be a string`);
+  }
+  return { body, file, kind: kind as NoteKind, line };
+};
+
+const extractNotes = (value: unknown): Note[] => {
+  if (!isRecord(value) || value.notes === undefined) {
+    return [];
+  }
+  if (!Array.isArray(value.notes)) {
+    throw Errors.invalidChaptersJson('"notes" must be an array');
+  }
+  return value.notes.map((entry, index) => validateNote(entry, index));
+};
+
+/** Parse a review JSON string into its chapters plus optional inline notes. */
+export const parseReview = (text: string): Review => {
+  const value = parseJson(text);
+  return { chapters: validateChapterArray(extractChapters(value)), notes: extractNotes(value) };
+};
+
 /** Drop file references the diff does not contain, and chapters left empty. */
 export const pruneUnknownFiles = (chapters: Chapter[], files: DiffFile[]): Chapter[] => {
   const known = new Set(files.map((file) => file.path));
@@ -141,3 +194,9 @@ export const appendLeftovers = (chapters: Chapter[], files: DiffFile[]): Chapter
 /** Normalize agent-supplied chapters against the diff: prune unknowns, append leftovers. */
 export const reconcileChapters = (chapters: Chapter[], files: DiffFile[]): Chapter[] =>
   appendLeftovers(pruneUnknownFiles(chapters, files), files);
+
+/** Reconcile a whole review: normalize chapters and drop notes that do not anchor. */
+export const reconcileReview = (review: Review, files: DiffFile[]): Review => ({
+  chapters: reconcileChapters(review.chapters, files),
+  notes: anchorNotes(review.notes, files),
+});

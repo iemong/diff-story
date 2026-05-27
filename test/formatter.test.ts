@@ -1,4 +1,4 @@
-import type { Chapter, DiffFile } from "../src/types";
+import type { Chapter, DiffFile, Note } from "../src/types";
 import { FIRST, SECOND } from "./helpers";
 import { describe, expect, test } from "bun:test";
 import { formatFilesJson, formatJson, formatStory, renderBanner, wordWrap } from "../src/formatter";
@@ -131,7 +131,7 @@ describe("formatStory — fold", () => {
   ];
 
   test("folds noise files behind a one-line summary when fold is on", () => {
-    const story = formatStory([lock, src], chapters, true);
+    const story = formatStory([lock, src], chapters, { fold: true });
     expect(story).toContain("# ── package-lock.json (lockfile)");
     expect(story).toContain("folded");
     expect(story).not.toContain("+huge");
@@ -139,13 +139,59 @@ describe("formatStory — fold", () => {
   });
 
   test("keeps every file verbatim when fold is off", () => {
-    const story = formatStory([lock, src], chapters, false);
+    const story = formatStory([lock, src], chapters, { fold: false });
     expect(story).toContain("+huge");
     expect(story).not.toContain("folded");
   });
 
   test("does not fold by default (fold is opt-in)", () => {
     expect(formatStory([lock, src], chapters)).toContain("+huge");
+  });
+});
+
+describe("formatStory — notes", () => {
+  const HUNK_RAW = [
+    "diff --git a/src/a.ts b/src/a.ts",
+    "--- a/src/a.ts",
+    "+++ b/src/a.ts",
+    "@@ -1,2 +1,2 @@",
+    "-const a = 1;",
+    "+const a = 2;",
+    " export default a;",
+  ].join("\n");
+  const withHunk = file("src/a.ts", { rawText: HUNK_RAW });
+  const chapters: Chapter[] = [{ files: ["src/a.ts"], synopsis: "s", title: "T" }];
+
+  test("inserts a note right after the line it anchors to", () => {
+    const story = formatStory([withHunk], chapters, {
+      notes: [{ body: "off by one?", file: "src/a.ts", kind: "issue", line: ONE }],
+    });
+    const lines = story.split("\n");
+    const added = lines.findIndex((row) => row.includes("+const a = 2;"));
+    expect(lines[added + ONE]).toBe("# 💬 [issue] off by one?");
+  });
+
+  test("attaches several notes on the same file", () => {
+    const story = formatStory([withHunk], chapters, {
+      notes: [
+        { body: "first note", file: "src/a.ts", kind: "issue", line: ONE },
+        { body: "second note", file: "src/a.ts", kind: "nit", line: ONE + ONE },
+      ],
+    });
+    expect(story).toContain("first note");
+    expect(story).toContain("second note");
+  });
+
+  test("a folded file drops its notes", () => {
+    const lock = file("yarn.lock", {
+      rawText: "diff --git a/yarn.lock b/yarn.lock\n@@ -1 +1 @@\n+dep",
+    });
+    const story = formatStory([lock], [{ files: ["yarn.lock"], synopsis: "s", title: "T" }], {
+      fold: true,
+      notes: [{ body: "x", file: "yarn.lock", kind: "issue", line: ONE }],
+    });
+    expect(story).toContain("(lockfile)");
+    expect(story).not.toContain("💬");
   });
 });
 
@@ -207,5 +253,16 @@ describe("formatJson", () => {
     const json = JSON.parse(formatJson(chapters, [file("a.ts")]));
     expect(json.chapters[FIRST]).not.toHaveProperty("risk");
     expect(json.chapters[FIRST]).not.toHaveProperty("checklist");
+  });
+
+  test("includes top-level notes when present", () => {
+    const note: Note = { body: "b", file: "a.ts", kind: "issue", line: ONE };
+    const json = JSON.parse(formatJson(chapters, [file("a.ts")], [note]));
+    expect(json.notes).toEqual([note]);
+  });
+
+  test("omits notes when there are none", () => {
+    const json = JSON.parse(formatJson(chapters, [file("a.ts")]));
+    expect(json).not.toHaveProperty("notes");
   });
 });
