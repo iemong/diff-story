@@ -44,6 +44,8 @@ export { formatFilesJson, formatJson, formatStory } from "./formatter";
 
 export { classifyNoise, type NoiseKind } from "./noise";
 
+export { effectiveRisk, orderByRisk } from "./risk";
+
 export { DiffStoryError, type ErrorInfo, Errors } from "./errors";
 
 export type { Chapter, DiffFile, Risk } from "./types";

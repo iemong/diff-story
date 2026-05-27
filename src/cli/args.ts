@@ -3,12 +3,15 @@ import { parseArgs } from "node:util";
 
 const FIRST = 0;
 
+export type Order = "narrative" | "risk";
+
 export interface CliFlags {
   help: boolean;
   version: boolean;
   json: boolean;
   jsonSchema: boolean;
   fold: boolean;
+  order: Order;
   chapters?: string;
   chaptersJson?: string;
   agent?: string;
@@ -27,8 +30,19 @@ const OPTIONS = {
   help: { short: "h", type: "boolean" },
   json: { type: "boolean" },
   "json-schema": { type: "boolean" },
+  order: { type: "string" },
   version: { short: "v", type: "boolean" },
 } as const;
+
+const toOrder = (value: string | undefined): Order => {
+  if (value === undefined || value === "narrative") {
+    return "narrative";
+  }
+  if (value === "risk") {
+    return "risk";
+  }
+  throw Errors.badArguments(`--order must be "narrative" or "risk", got "${value}"`);
+};
 
 type ParsedArgs = ReturnType<typeof parseArgs<{ options: typeof OPTIONS; allowPositionals: true }>>;
 
@@ -62,6 +76,7 @@ export const parseCliArgs = (argv: string[]): ParsedCli => {
       help: values.help === true,
       json: values.json === true,
       jsonSchema: values["json-schema"] === true,
+      order: toOrder(values.order),
       version: values.version === true,
     },
   };

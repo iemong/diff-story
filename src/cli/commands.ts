@@ -5,6 +5,7 @@ import { parseChaptersJson, reconcileChapters } from "../chapters";
 import type { CliFlags } from "./args";
 import { Errors } from "../errors";
 import { buildPlan } from "../plan";
+import { orderByRisk } from "../risk";
 import { parseUnifiedDiff } from "../parser";
 
 const OK = 0;
@@ -48,10 +49,14 @@ export const runParse = async (io: Io): Promise<number> => {
 };
 
 const renderStory = (flags: CliFlags, files: DiffFile[], chapters: Chapter[]): string => {
-  if (flags.json) {
-    return formatJson(chapters, files);
+  let ordered = chapters;
+  if (flags.order === "risk") {
+    ordered = orderByRisk(chapters, files);
   }
-  return formatStory(files, chapters, flags.fold);
+  if (flags.json) {
+    return formatJson(ordered, files);
+  }
+  return formatStory(files, ordered, flags.fold);
 };
 
 /** Re-emit the diff grouped under the chapters the agent supplies. */
